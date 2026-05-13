@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(py --version)",
+      "PowerShell(python --version)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\" -Directory | ForEach-Object { Get-ChildItem \"$\\($_.FullName\\)\\\\AppData\\\\Local\\\\Programs\\\\Python\" -ErrorAction SilentlyContinue } | Select-Object FullName -First 5)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Programs\" -Directory -ErrorAction SilentlyContinue | Select-Object Name)",
+      "Bash(del \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\00.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\01_viewcode.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\02_workflow.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\03_workflow_opti.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\04.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\05_.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\06.md\" \"E:\\\\DoCode\\\\CD2\\\\source\\\\Source\\\\get_hrs_rs\\\\rs\\\\Docs\\\\07.md\")"
+    ]
+  }
+}
