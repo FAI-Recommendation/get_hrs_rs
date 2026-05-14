@@ -6,6 +6,14 @@
 
 cd "$(dirname "$0")/../.."
 
+# Load environment variables from repo root .env if present
+if [ -f .env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+fi
+
 python train.py \
     --data_path ../../get10k_data/clip_10k_sample \
     --dataset "" \

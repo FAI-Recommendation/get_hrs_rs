@@ -286,7 +286,7 @@ class Data:
         sim[sim < threshold] = 0
         return sp.csr_matrix(sim)
 
-    def create_multimodal_similarity_matrix(self, method="late_fusion", alpha=0.5, pca_components=256):
+    def create_multimodal_similarity_matrix(self, method="late_fusion", alpha=0.5, pca_components=None):
         """Kết hợp text + image embeddings. Methods: late_fusion | aggregation | pca | attention"""
         required_cols = {"feature1", "feature2", "feature3"}
         if not required_cols.issubset(self.items_features.columns):
@@ -319,8 +319,23 @@ class Data:
             combined_sim = cosine_similarity(combined_emb, combined_emb)
 
         elif method == "pca":
+            # Determine PCA components dynamically if not provided.
             if pca_components is None:
-                raise ValueError("pca_components phải được chỉ định.")
+                # Check environment override first
+                env_val = os.getenv("MULTIMODAL_PCA_COMPONENTS")
+                if env_val is not None and env_val.strip() != "":
+                    try:
+                        pca_components = int(env_val)
+                        print(f"   MULTIMODAL_PCA_COMPONENTS from env: {pca_components}")
+                    except Exception:
+                        raise ValueError("Invalid MULTIMODAL_PCA_COMPONENTS environment variable (must be int).")
+                else:
+                    # default: sum of text+image dims capped at 768
+                    text_dim = text_embeddings.shape[1]
+                    img_dim = image_embeddings.shape[1]
+                    pca_components = min(text_dim + img_dim, 768)
+                    print(f"   Auto-selected pca_components={pca_components} (text_dim={text_dim}, img_dim={img_dim})")
+
             combined_emb = np.concatenate([text_embeddings, image_embeddings], axis=1)
             pca = PCA(n_components=pca_components)
             reduced = pca.fit_transform(combined_emb)
@@ -438,7 +453,8 @@ class Data:
         full_bert_item = _load_or_build("full_bert_item_similarity_adj_mat", self.create_full_bert_similarity_matrix)
         multimodal = _load_or_build(
             "multimodal_similarity_adj_mat",
-            lambda: self.create_multimodal_similarity_matrix(method="late_fusion", alpha=0.5, pca_components=768),
+            # use default multimodal settings; pca_components is only used when method='pca'
+            lambda: self.create_multimodal_similarity_matrix(method="late_fusion", alpha=0.5),
         )
         img_only = _load_or_build(
             "img_similarity_adj_mat",
