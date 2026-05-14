@@ -14,6 +14,34 @@ pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
 
 > Image nay da co PyTorch 2.1.2 + CUDA 12.1. **Khong can cai lai torch.**
 
+If you pick the Docker image `pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime`, use the following quick checklist to avoid common build problems:
+
+- Install system build tools (needed to compile torch extensions if required):
+
+```bash
+sudo apt update && sudo apt install -y git tmux curl build-essential python3-dev cmake libomp-dev
+```
+git clone 
+
+chmod +x rs/lightgcn_pyg/scripts/setup_env.sh
+
+- Install Python deps (using `uv` to install into the system Python within the pod image):
+
+```bash
+# install package extras (project libs) into the image system Python
+uv pip install --system -e ".[docker]"
+
+# then install PyG and the matching sparse wheel for torch 2.1.2 + CUDA 12.1
+uv pip install --system torch-geometric
+uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+```
+
+You can verify installation with:
+
+```bash
+python3 -c "import torch, torch_geometric, torch_sparse; print(torch.__version__, torch.cuda.is_available(), torch_geometric.__version__)"
+```
+
 GPU khuyen nghi:
 
 | GPU | VRAM | Thoi gian train (img_only) | Chi phi uoc tinh |
@@ -44,7 +72,7 @@ python3 -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ## 3. Cai cong cu can thiet
 
 ```bash
-apt update && apt install -y git tmux curl gcc python3-dev
+sudo apt update && sudo apt install -y git tmux curl build-essential python3-dev cmake libomp-dev
 ```
 
 > `gcc` va `python3-dev` can thiet cho cac extension compile (torch-sparse).
@@ -102,7 +130,7 @@ uv pip install --system -e ".[docker]"
 uv pip install --system torch-geometric
 uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
 ```
-
+source .venv/bin/activate # linux
 > **Khong dung `uv sync`** — no tao `.venv` moi voi torch CUDA 12.4 thay vi dung torch 2.1.2 co san.
 
 Kiem tra sau khi cai:
@@ -140,6 +168,7 @@ python3 -c "import wandb; wandb.login(); print('wandb OK')"
 ```bash
 # Dung token Write tu: huggingface.co/settings/tokens
 huggingface-cli login
+hf auth login 
 ```
 
 Kiem tra token hop le:

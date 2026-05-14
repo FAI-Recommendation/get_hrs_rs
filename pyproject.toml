@@ -34,7 +34,8 @@ tracking = [
 # Local CPU dev (khong co GPU) — chi de test logic
 # Cai: uv pip install -e ".[cpu]"
 cpu = [
-    "torch>=2.1.0",
+    # Note: do NOT force-install `torch` here for CPU extra.
+    # Install `torch` separately (or use the Docker image) to ensure CUDA/build compatibility.
     "torch-geometric",
     "wandb",
     "huggingface_hub>=0.20.0",
