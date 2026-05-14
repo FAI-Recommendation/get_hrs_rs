@@ -1,23 +1,57 @@
 [project]
 name = "get-hrs-rs"
 version = "0.1.0"
-description = "Hệ thống gợi ý thời trang cho thuê (Rental Fashion)"
+description = "He thong goi y thoi trang cho thue (Rental Fashion Recommendation)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10"   # 3.10 de tuong thich voi Docker image pytorch/pytorch:2.1.2-cuda12.1
 dependencies = [
-    "tensorflow>=2.15.0",
+    # Data
     "pandas>=2.0.0",
     "numpy<2.0.0",
+    "scipy",
     "scikit-learn",
+    # NLP — BERT cho item similarity
+    "transformers>=4.36.0",
+    # Visualization / utils
     "pillow",
     "matplotlib",
     "seaborn",
     "tqdm",
+    # Logging — TensorBoard (PyTorch built-in, cung format voi TF)
+    "tensorboard",
+    # Notebook
     "ipykernel",
 ]
 
+[project.optional-dependencies]
+# Tracking & model storage (optional — them khi can)
+# Cai: uv pip install -e ".[tracking]"
+tracking = [
+    "wandb",
+    "huggingface_hub>=0.20.0",
+]
+
+# Local CPU dev (khong co GPU) — chi de test logic
+# Cai: uv pip install -e ".[cpu]"
+cpu = [
+    "torch>=2.1.0",
+    "torch-geometric",
+    "wandb",
+    "huggingface_hub>=0.20.0",
+]
+
+# Docker GPU pod — torch da co san trong image, chi cai phan con lai
+# Cai: uv pip install --system -e ".[docker]"
+# Sau do cai torch-geometric + torch-sparse rieng:
+#   pip install torch-geometric
+#   pip install torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+docker = [
+    "wandb",
+    "huggingface_hub>=0.20.0",
+]
+
 [tool.uv]
-package = false  # QUAN TRỌNG: Dòng này báo uv chỉ quản lý thư viện, không cần build package
+package = false  # bao uv chi quan ly thu vien, khong can build package
 
 [build-system]
 requires = ["hatchling"]
