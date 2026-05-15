@@ -316,7 +316,8 @@ class Data:
         ].apply(self.preprocess_text)
 
         text_embeddings = self.get_bert_embeddings_batch(
-            self.items_features["cleaned_combined_text"].tolist()
+            self.items_features["cleaned_combined_text"].tolist(),
+            batch_size=128,
         )
         print(f"   Text embeddings shape: {text_embeddings.shape}")
 
