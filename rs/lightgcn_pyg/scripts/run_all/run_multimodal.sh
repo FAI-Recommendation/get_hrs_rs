@@ -8,13 +8,17 @@ cd "$(dirname "$0")/../.."
 
 [ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
 
-# Load environment variables from repo root .env if present
-if [ -f .env ]; then
-    set -a
-    # shellcheck disable=SC1091
-    source .env
-    set +a
-fi
+# Load .env: thu muc hien tai (rs/lightgcn_pyg/) hoac repo root (../../)
+for _env in ".env" "../../.env"; do
+    if [ -f "$_env" ]; then
+        set -a
+        # shellcheck disable=SC1091
+        source "$_env"
+        set +a
+        echo "   📋 Loaded env: $_env"
+        break
+    fi
+done
 
 python3 train.py \
     --data_path ../get10k_data/clip_10k_sample \
