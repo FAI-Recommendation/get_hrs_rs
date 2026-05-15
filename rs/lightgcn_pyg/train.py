@@ -95,6 +95,20 @@ def main():
     n_layers = len(eval(args.layer_size))
     decay = eval(args.regs)[0]
 
+    # ── Auto-detect wandb / HF from environment variables ──
+    # Neu .env co WANDB_API_KEY → tu dong bat wandb (khong can --use_wandb 1)
+    if not args.use_wandb and os.environ.get("WANDB_API_KEY", "").strip():
+        args.use_wandb = 1
+    if not args.wandb_project:
+        args.wandb_project = os.environ.get("WANDB_PROJECT", "combigcn-rs")
+    if not args.wandb_entity:
+        args.wandb_entity = os.environ.get("WANDB_ENTITY", "")
+    # Neu .env co HF_TOKEN + HF_REPO_ID → tu dong bat HF push
+    if not args.use_hf and os.environ.get("HF_TOKEN", "").strip():
+        args.use_hf = 1
+    if not args.hf_repo_id:
+        args.hf_repo_id = os.environ.get("HF_REPO_ID", "")
+
     # ── Device ──
     if torch.cuda.is_available() and args.gpu_id >= 0:
         device = torch.device(f"cuda:{args.gpu_id}")

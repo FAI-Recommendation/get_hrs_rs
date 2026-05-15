@@ -24,10 +24,10 @@ python3 train.py \
     --layer_size "[64,64,64]" \
     --lr 0.001 \
     --regs "[1e-5]" \
-    --batch_size 1024 \
+    --batch_size 8192 \
     --epoch 1000 \
     --eval_interval 10 \
-    --early_stop_steps 5 \
+    --early_stop_steps 20 \
     --Ks "[1,5,10,20,50]" \
     --verbose 1 \
     --save_flag 1 \
