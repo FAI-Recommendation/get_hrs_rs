@@ -156,13 +156,8 @@ def main():
     ).to(device)
     print(f"\n🏗️  Model: {model}")
 
-    # ── torch.compile (PyTorch 2.x — 20-40% speedup, one-time warmup) ──
-    if hasattr(torch, "compile") and torch.cuda.is_available():
-        try:
-            model = torch.compile(model)
-            print("⚡ torch.compile() enabled")
-        except Exception as e:
-            print(f"⚠️  torch.compile() failed (skipping): {e}")
+    # ── torch.compile disabled: không tương thích với torch_sparse custom kernels ──
+    # torch_sparse dùng ind2ptr (custom CUDA op) không thể trace bằng TorchDynamo
 
     # ── AMP: Automatic Mixed Precision fp16 (~2x faster, ít VRAM hơn) ──
     use_amp = torch.cuda.is_available()
