@@ -4,7 +4,9 @@
 # Dùng để verify toàn bộ pipeline hoạt động trước khi run_all
 # ─────────────────────────────────────────────
 
-set -e  # Dừng nếu bất kỳ script nào fail
+set -e  # Dung neu bat ky script nao fail
+
+[ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
 
 SCRIPT_DIR="$(dirname "$0")"
 

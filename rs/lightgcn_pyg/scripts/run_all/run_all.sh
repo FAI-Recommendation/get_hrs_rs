@@ -7,6 +7,8 @@
 
 set -e
 
+[ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
+
 SCRIPT_DIR="$(dirname "$0")"
 START_TIME=$(date +%s)
 
