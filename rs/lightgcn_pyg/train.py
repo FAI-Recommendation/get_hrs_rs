@@ -57,8 +57,15 @@ def format_metrics(ret, Ks):
 # ─────────────────────────────────────────────
 # Push best model to HuggingFace Hub
 # ─────────────────────────────────────────────
-def push_to_hf(local_path, hf_repo_id, epoch, recall_score):
-    """Push best_model.pt to HuggingFace Hub. No-op if HF not available."""
+def push_to_hf(local_path, hf_repo_id, epoch, recall_score, sim_type="none"):
+    """
+    Push best_model.pt to HuggingFace Hub theo sim_type riêng biệt.
+    Cấu trúc trên HF repo:
+      none/best_model.pt
+      img_only/best_model.pt
+      multimodal/best_model.pt
+      tfidf/best_model.pt
+    """
     if not HF_AVAILABLE:
         print("   ⚠️  huggingface_hub not installed. Skipping HF push.")
         return
@@ -74,14 +81,15 @@ def push_to_hf(local_path, hf_repo_id, epoch, recall_score):
             exist_ok=True,
             private=True,
         )
+        path_in_repo = f"{sim_type}/best_model.pt"
         api.upload_file(
             path_or_fileobj=local_path,
-            path_in_repo="best_model.pt",
+            path_in_repo=path_in_repo,
             repo_id=hf_repo_id,
             repo_type="model",
-            commit_message=f"Best model epoch={epoch} recall@K={recall_score:.5f}",
+            commit_message=f"[{sim_type}] Best model epoch={epoch} recall@K={recall_score:.5f}",
         )
-        print(f"   🤗 Pushed to HF Hub: https://huggingface.co/{hf_repo_id}")
+        print(f"   🤗 Pushed to HF Hub: https://huggingface.co/{hf_repo_id}/blob/main/{path_in_repo}")
     except Exception as e:
         print(f"   ⚠️  HF push failed: {e}")
 
@@ -374,6 +382,7 @@ def main():
                     hf_repo_id=args.hf_repo_id,
                     epoch=epoch,
                     recall_score=ret_test["recall"][0],
+                    sim_type=args.sim_type,
                 )
 
         if should_stop:
