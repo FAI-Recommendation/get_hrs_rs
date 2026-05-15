@@ -6,6 +6,8 @@
 
 cd "$(dirname "$0")/../.."
 
+[ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
+
 # Load environment variables from repo root .env if present
 if [ -f .env ]; then
     set -a
