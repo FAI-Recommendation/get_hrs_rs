@@ -44,8 +44,8 @@ cpu = [
 # Docker GPU pod — torch da co san trong image, chi cai phan con lai
 # Cai: uv pip install --system -e ".[docker]"
 # Sau do cai torch-geometric + torch-sparse rieng:
-#   pip install torch-geometric
-#   pip install torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+#   uv pip install --system torch-geometric
+#   uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.9.0+cu128.html
 docker = [
     "wandb",
     "huggingface_hub>=0.20.0",

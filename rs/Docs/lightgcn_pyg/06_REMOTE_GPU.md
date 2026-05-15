@@ -9,12 +9,12 @@ Huong dan thue GPU cloud va chay toan bo CombiGCN pipeline qua SSH.
 Khi tao pod tren RunPod / Vast.ai, chon:
 
 ```
-pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
+pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 ```
 
-> Image nay da co PyTorch 2.1.2 + CUDA 12.1. **Khong can cai lai torch.**
+> Image nay da co PyTorch 2.9.1 + CUDA 12.8. **Khong can cai lai torch.**
 
-If you pick the Docker image `pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime`, use the following quick checklist to avoid common build problems:
+If you pick the Docker image `pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime`, use the following quick checklist to avoid common build problems:
 
 - Install system build tools (needed to compile torch extensions if required):
 
@@ -23,7 +23,7 @@ sudo apt update && sudo apt install -y git tmux curl build-essential python3-dev
 ```
 git clone 
 
-chmod +x rs/lightgcn_pyg/scripts/setup_env.sh
+chmod +x get_hrs_rs/rs/lightgcn_pyg/scripts/setup_env.sh
 
 - Install Python deps (using `uv` to install into the system Python within the pod image):
 
@@ -31,9 +31,9 @@ chmod +x rs/lightgcn_pyg/scripts/setup_env.sh
 # install package extras (project libs) into the image system Python
 uv pip install --system -e ".[docker]"
 
-# then install PyG and the matching sparse wheel for torch 2.1.2 + CUDA 12.1
+# then install PyG and the matching sparse wheel for torch 2.9.1 + CUDA 12.8
 uv pip install --system torch-geometric
-uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+uv pip install --system pyg_lib torch_scatter torch_sparse torch -f https://data.pyg.org/whl/torch-2.9.0+cu128.html
 ```
 
 You can verify installation with:
@@ -119,31 +119,36 @@ GPU_ID=0
 
 ---
 
-## 5. Cai dependencies
+## 5. Cai dependencies (1 lenh duy nhat)
+
+Script `setup_env.sh` tu dong xu ly het:
+- Detect CUDA version tu `nvidia-smi`
+- **Cai torch** neu chua co (chon dung version cho CUDA do)
+- Cai torch-geometric + torch-sparse + pyg_lib
+- Cai tat ca project dependencies
+- Verify imports cuoi cung
 
 ```bash
-# Cai vao system Python — torch da co san trong image, khong cai lai
-uv pip install --system -e ".[docker]"
-
-# Cai torch-geometric va torch-sparse (can match voi torch version trong image)
-# Cho torch 2.1.2 + CUDA 12.1:
-uv pip install --system torch-geometric
-uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+bash rs/lightgcn_pyg/scripts/setup_env.sh
 ```
-source .venv/bin/activate # linux
-> **Khong dung `uv sync`** — no tao `.venv` moi voi torch CUDA 12.4 thay vi dung torch 2.1.2 co san.
 
-Kiem tra sau khi cai:
+Script in ra 8 buoc ro rang, neu buoc nao fail se hien canh bao.
 
+**Neu muon pin version cu the** (optional):
+```bash
+TORCH_VERSION=2.9.0 CUDA_TAG=cu128 bash rs/lightgcn_pyg/scripts/setup_env.sh
+```
+
+> **Khong dung `uv sync`** — no tao `.venv` moi tach biet, khong dung Python cua image.
+
+Kiem tra thu cong neu can:
 ```bash
 python3 -c "
 import torch
 import torch_geometric
 import torch_sparse
 print('torch:', torch.__version__)
-print('torch_geometric:', torch_geometric.__version__)
 print('CUDA available:', torch.cuda.is_available())
-print('GPU:', torch.cuda.get_device_name(0))
 "
 ```
 
@@ -319,24 +324,19 @@ model.eval()
 # 1. SSH
 ssh root@<pod-ip> -p <port>
 
-# 2. Cai tools
-apt update && apt install -y git tmux curl gcc python3-dev
-curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
-
-# 3. Clone & setup
+# 2. Clone & setup
 git clone https://<user>:<PAT>@github.com/<org>/<repo>.git && cd <repo>
 git remote set-url origin https://github.com/<org>/<repo>.git
 cp .env.example .env && nano .env
 
-# 4. Install
-uv pip install --system -e ".[docker]"
-uv pip install --system torch-geometric
-uv pip install --system torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
+# 3. Chay setup_env.sh — tu dong cai het (torch + PyG + dependencies)
+bash rs/lightgcn_pyg/scripts/setup_env.sh
 
-# 5. Verify
-python3 -c "import torch; import torch_sparse; print(torch.cuda.is_available())"
+# 4. (Optional) Dang nhap wandb + HF
+wandb login
+huggingface-cli login
 
-# 6. Smoke test + train trong tmux
+# 5. Smoke test + train trong tmux
 tmux new -s train
 cd rs/lightgcn_pyg
 chmod +x scripts/test/*.sh scripts/run_all/*.sh
