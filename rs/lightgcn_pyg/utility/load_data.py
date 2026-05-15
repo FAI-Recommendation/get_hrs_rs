@@ -21,11 +21,44 @@ import pandas as pd
 import scipy.sparse as sp
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from numpy import ndarray
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from transformers import BertModel, BertTokenizer
+
+
+# ─────────────────────────────────────────────
+# GPU cosine similarity — thay the sklearn.cosine_similarity (CPU)
+# Nhanh hon ~20-50x nho GPU mat mul
+# ─────────────────────────────────────────────
+def cosine_sim_gpu(a, b=None):
+    """
+    Tinh cosine similarity matrix tren GPU.
+    a, b: numpy array (n, dim) hoac scipy sparse matrix.
+    Tra ve: numpy array (n, n).
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Convert sparse → dense neu can
+    if sp.issparse(a):
+        a = a.toarray().astype(np.float32)
+    if b is not None and sp.issparse(b):
+        b = b.toarray().astype(np.float32)
+
+    a_t = torch.tensor(np.array(a, dtype=np.float32)).to(device)
+    b_t = a_t if b is None else torch.tensor(np.array(b, dtype=np.float32)).to(device)
+
+    a_norm = F.normalize(a_t, p=2, dim=1)
+    b_norm = F.normalize(b_t, p=2, dim=1)
+
+    # Tinh theo batch de tranh OOM tren GPU lon
+    batch = 512
+    rows = []
+    for i in range(0, a_norm.shape[0], batch):
+        chunk = torch.mm(a_norm[i:i+batch], b_norm.t())
+        rows.append(chunk.cpu())
+    return torch.cat(rows, dim=0).numpy()
 
 
 # ─────────────────────────────────────────────
@@ -213,7 +246,7 @@ class Data:
         )
         vectorizer = TfidfVectorizer()
         tfidf_matrix = vectorizer.fit_transform(self.items_features["combined_features"])
-        cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+        cosine_sim = cosine_sim_gpu(tfidf_matrix)
         cosine_sim[cosine_sim < 0.5] = 0
         return sp.csr_matrix(cosine_sim)
 
@@ -226,13 +259,13 @@ class Data:
         texts = self.items_features["cleaned_feature2"].tolist()
         bert_embeddings = self.get_bert_embeddings_batch(texts, batch_size=64)
 
-        bert_sim = cosine_similarity(bert_embeddings, bert_embeddings)
+        bert_sim = cosine_sim_gpu(bert_embeddings)
         bert_sim[bert_sim < 0.5] = 0
         bert_similarity_matrix = sp.csr_matrix(bert_sim)
 
         vectorizer = TfidfVectorizer()
         tfidf_matrix = vectorizer.fit_transform(self.items_features["feature1"])
-        tfidf_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+        tfidf_sim = cosine_sim_gpu(tfidf_matrix)
         tfidf_sim[tfidf_sim < 0.5] = 0
         tfidf_similarity_matrix = sp.csr_matrix(tfidf_sim)
 
@@ -251,7 +284,7 @@ class Data:
         texts = self.items_features["cleaned_combined_features"].tolist()
         bert_embeddings = self.get_bert_embeddings_batch(texts, batch_size=64)
 
-        bert_sim = cosine_similarity(bert_embeddings, bert_embeddings)
+        bert_sim = cosine_sim_gpu(bert_embeddings)
         bert_sim[bert_sim < 0.5] = 0
         return sp.csr_matrix(bert_sim)
 
@@ -265,7 +298,7 @@ class Data:
         ).astype(np.float32)
         print(f"   Image embeddings shape: {image_embeddings.shape}")
 
-        sim = cosine_similarity(image_embeddings, image_embeddings)
+        sim = cosine_sim_gpu(image_embeddings)
         sim[sim < threshold] = 0
         return sp.csr_matrix(sim)
 
@@ -293,13 +326,13 @@ class Data:
         print(f"   Image embeddings shape: {image_embeddings.shape}")
 
         if method == "late_fusion":
-            text_sim = cosine_similarity(text_embeddings, text_embeddings)
-            img_sim = cosine_similarity(image_embeddings, image_embeddings)
+            text_sim = cosine_sim_gpu(text_embeddings)
+            img_sim = cosine_sim_gpu(image_embeddings)
             combined_sim = alpha * text_sim + (1 - alpha) * img_sim
 
         elif method == "aggregation":
             combined_emb = (text_embeddings + image_embeddings) / 2
-            combined_sim = cosine_similarity(combined_emb, combined_emb)
+            combined_sim = cosine_sim_gpu(combined_emb)
 
         elif method == "pca":
             # Determine PCA components dynamically if not provided.
@@ -322,7 +355,7 @@ class Data:
             combined_emb = np.concatenate([text_embeddings, image_embeddings], axis=1)
             pca = PCA(n_components=pca_components)
             reduced = pca.fit_transform(combined_emb)
-            combined_sim = cosine_similarity(reduced, reduced)
+            combined_sim = cosine_sim_gpu(reduced)
 
         elif method == "attention":
             text_tensor = torch.tensor(text_embeddings, dtype=torch.float32)
@@ -335,9 +368,7 @@ class Data:
 
             wa = WeightedAttention(embed_dim=embed_dim)
             combined_emb = wa(text_att, img_att)
-            combined_sim = cosine_similarity(
-                combined_emb.detach().numpy(), combined_emb.detach().numpy()
-            )
+            combined_sim = cosine_sim_gpu(combined_emb.detach().numpy())
         else:
             raise ValueError(f"method '{method}' không hợp lệ.")
 
