@@ -29,9 +29,9 @@ python3 train.py \
     --lr 0.001 \
     --regs "[1e-5]" \
     --batch_size 8192 \
-    --epoch 1000 \
+    --epoch 500 \
     --eval_interval 20 \
-    --early_stop_steps 20 \
+    --early_stop_steps 0 \
     --Ks "[1,5,10,20,50]" \
     --verbose 1 \
     --save_flag 1 \
