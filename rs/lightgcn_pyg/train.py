@@ -156,6 +156,19 @@ def main():
     ).to(device)
     print(f"\n🏗️  Model: {model}")
 
+    # ── torch.compile (PyTorch 2.x — 20-40% speedup, one-time warmup) ──
+    if hasattr(torch, "compile") and torch.cuda.is_available():
+        try:
+            model = torch.compile(model)
+            print("⚡ torch.compile() enabled")
+        except Exception as e:
+            print(f"⚠️  torch.compile() failed (skipping): {e}")
+
+    # ── AMP: Automatic Mixed Precision fp16 (~2x faster, ít VRAM hơn) ──
+    use_amp = torch.cuda.is_available()
+    scaler  = torch.cuda.amp.GradScaler() if use_amp else None
+    print(f"🔥 AMP (fp16): {'ON' if use_amp else 'OFF'}")
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # ── Run name (dung cho ca TensorBoard, wandb) ──
@@ -236,14 +249,20 @@ def main():
             pos_t = torch.LongTensor(pos_items).to(device)
             neg_t = torch.LongTensor(neg_items).to(device)
 
-            loss, mf_loss, reg_loss = model(
-                interaction_adj, similarity_adj,
-                users_t, pos_t, neg_t,
-            )
-
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            with torch.cuda.amp.autocast(enabled=use_amp):
+                loss, mf_loss, reg_loss = model(
+                    interaction_adj, similarity_adj,
+                    users_t, pos_t, neg_t,
+                )
+
+            if scaler:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
 
             epoch_loss += loss.item() / n_batch
             epoch_mf_loss += mf_loss.item() / n_batch

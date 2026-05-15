@@ -26,7 +26,7 @@ python3 train.py \
     --regs "[1e-5]" \
     --batch_size 8192 \
     --epoch 1000 \
-    --eval_interval 10 \
+    --eval_interval 20 \
     --early_stop_steps 20 \
     --Ks "[1,5,10,20,50]" \
     --verbose 1 \
