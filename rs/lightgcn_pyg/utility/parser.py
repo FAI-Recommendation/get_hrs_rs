@@ -58,6 +58,8 @@ def parse_args():
     # ── Save / Load ──
     parser.add_argument("--save_flag", type=int, default=1,
                         help="0: Disable model saver, 1: Activate model saver")
+    parser.add_argument("--checkpoint_interval", type=int, default=0,
+                        help="Luu checkpoint moi N epoch (0 = tat). VD: 50 = luu moi 50 epoch")
     parser.add_argument("--weights_path", nargs="?", default="weights/",
                         help="Store model path.")
     parser.add_argument("--output_path", type=str, default="output/",

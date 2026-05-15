@@ -35,6 +35,7 @@ python3 train.py \
     --Ks "[1,5,10,20,50]" \
     --verbose 1 \
     --save_flag 1 \
+    --checkpoint_interval 100 \
     --weights_path weights/ \
     --output_path output/ \
     --gpu_id 0

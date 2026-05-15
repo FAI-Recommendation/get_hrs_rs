@@ -338,7 +338,20 @@ def main():
             stopping_step, expected_order="acc", flag_step=args.early_stop_steps,
         )
 
-        # ── Save best model ──
+        # ── Checkpoint moi N epoch (luu local) ──
+        if (args.save_flag and weights_dir
+                and args.checkpoint_interval > 0
+                and epoch % args.checkpoint_interval == 0):
+            ckpt_path = os.path.join(weights_dir, f"checkpoint_epoch{epoch}.pt")
+            torch.save({
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": epoch_loss,
+            }, ckpt_path)
+            print(f"   📌 Checkpoint saved: checkpoint_epoch{epoch}.pt")
+
+        # ── Save best model → HuggingFace only ──
         if (args.save_flag and weights_dir
                 and len(ret_test["recall"]) > 0
                 and ret_test["recall"][0] == cur_best_pre_0[0]):
