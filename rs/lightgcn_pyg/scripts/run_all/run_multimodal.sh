@@ -14,7 +14,7 @@ if [ -f .env ]; then
     set +a
 fi
 
-python train.py \
+python3 train.py \
     --data_path ../../get10k_data/clip_10k_sample \
     --dataset "" \
     --sim_type multimodal \
