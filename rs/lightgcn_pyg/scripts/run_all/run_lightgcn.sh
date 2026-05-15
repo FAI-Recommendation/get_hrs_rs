@@ -20,8 +20,8 @@ python3 train.py \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
     --sim_type none \
-    --embed_size 64 \
-    --layer_size "[64,64,64]" \
+    --embed_size 512 \
+    --layer_size "[512,512,512,512]" \
     --lr 0.001 \
     --regs "[1e-5]" \
     --batch_size 8192 \
