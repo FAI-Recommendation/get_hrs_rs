@@ -21,6 +21,7 @@ from time import time
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from utility.load_data import Data
 from utility.parser import parse_args
@@ -112,7 +113,7 @@ def main():
     # ── Build adjacency matrices ──
     print(f"\n🔨 Building adjacency matrices ...")
     t1 = time()
-    matrices = data.get_norm_adj_mat()
+    matrices = data.get_norm_adj_mat(sim_type=args.sim_type)
     interaction_adj = scipy_to_sparse_tensor(matrices[0], device=device)
 
     if args.sim_type == "none":
@@ -203,7 +204,9 @@ def main():
     rec_loger, pre_loger, ndcg_loger = [], [], []
     hit_loger, mrr_loger = [], []
 
-    for epoch in range(1, args.epoch + 1):
+    epoch_bar = tqdm(range(1, args.epoch + 1), desc="Training", unit="epoch")
+
+    for epoch in epoch_bar:
         t_epoch = time()
         model.train()
 
@@ -248,6 +251,8 @@ def main():
                 "train/reg_loss": epoch_reg_loss,
                 "epoch":          epoch,
             })
+
+        epoch_bar.set_postfix(loss=f"{epoch_loss:.4f}", mf=f"{epoch_mf_loss:.4f}")
 
         if args.verbose > 0 and epoch % args.verbose == 0:
             print(f"Epoch {epoch:4d} [{time() - t_epoch:.1f}s]: "

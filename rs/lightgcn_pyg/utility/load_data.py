@@ -218,23 +218,14 @@ class Data:
         return sp.csr_matrix(cosine_sim)
 
     def create_bert_similarity_matrix(self):
+        """BERT(feature2) * TF-IDF(feature1) — dung GPU batch."""
         self.items_features["cleaned_feature2"] = self.items_features["feature2"].apply(
             self.preprocess_text
         )
+        # GPU batch BERT (nhanh hon CPU 10-30x)
+        texts = self.items_features["cleaned_feature2"].tolist()
+        bert_embeddings = self.get_bert_embeddings_batch(texts, batch_size=64)
 
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        model = BertModel.from_pretrained("bert-base-uncased")
-
-        def get_bert_embeddings(text):
-            inputs = tokenizer(text, return_tensors="pt", max_length=512,
-                               truncation=True, padding="max_length")
-            with torch.no_grad():
-                outputs = model(**inputs)
-            return outputs.last_hidden_state.mean(dim=1).cpu().numpy()
-
-        bert_embeddings = np.vstack(
-            self.items_features["cleaned_feature2"].apply(get_bert_embeddings).to_numpy()
-        )
         bert_sim = cosine_similarity(bert_embeddings, bert_embeddings)
         bert_sim[bert_sim < 0.5] = 0
         bert_similarity_matrix = sp.csr_matrix(bert_sim)
@@ -248,6 +239,7 @@ class Data:
         return bert_similarity_matrix.multiply(tfidf_similarity_matrix)
 
     def create_full_bert_similarity_matrix(self):
+        """BERT(feature1 + feature2) — dung GPU batch."""
         self.items_features["combined_features"] = (
             self.items_features["feature1"] + " " + self.items_features["feature2"]
         )
@@ -255,19 +247,10 @@ class Data:
             "combined_features"
         ].apply(self.preprocess_text)
 
-        tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-        model = BertModel.from_pretrained("bert-base-uncased")
+        # GPU batch BERT
+        texts = self.items_features["cleaned_combined_features"].tolist()
+        bert_embeddings = self.get_bert_embeddings_batch(texts, batch_size=64)
 
-        def get_bert_embeddings(text):
-            inputs = tokenizer(text, return_tensors="pt", max_length=512,
-                               truncation=True, padding="max_length")
-            with torch.no_grad():
-                outputs = model(**inputs)
-            return outputs.last_hidden_state.mean(dim=1).cpu().numpy()
-
-        bert_embeddings = np.vstack(
-            self.items_features["cleaned_combined_features"].apply(get_bert_embeddings).to_numpy()
-        )
         bert_sim = cosine_similarity(bert_embeddings, bert_embeddings)
         bert_sim[bert_sim < 0.5] = 0
         return sp.csr_matrix(bert_sim)
@@ -422,15 +405,39 @@ class Data:
     # ─────────────────────────────────────────
     # get_norm_adj_mat — build / cache tất cả adj matrices
     # ─────────────────────────────────────────
-    def get_norm_adj_mat(self):
+    def get_norm_adj_mat(self, sim_type="all"):
         """
-        Trả về 8 normalized adjacency matrices (scipy.sparse):
+        Tra ve 8 normalized adjacency matrices (scipy.sparse):
           0: interaction, 1: social, 2: similar_users,
           3: tfidf_item, 4: bert_item, 5: full_bert_item,
           6: multimodal, 7: img_only
-        """
 
-        def _load_or_build(name, build_fn):
+        sim_type: chi build matrix can thiet, skip phan con lai (tra ve None).
+          "none"       → chi build index 0 (interaction)
+          "tfidf"      → build 0 + 3
+          "bert"       → build 0 + 4
+          "full_bert"  → build 0 + 5
+          "multimodal" → build 0 + 6
+          "img_only"   → build 0 + 7
+          "all"        → build tat ca (mac dinh cu)
+        """
+        # Map sim_type → index can build (ngoai index 0 luon build)
+        # Index nao can build (0 = interaction luon can)
+        _need = {
+            "none":       {0},
+            "tfidf":      {0, 3},
+            "bert":       {0, 4},
+            "full_bert":  {0, 5},
+            "multimodal": {0, 6},
+            "img_only":   {0, 7},
+            "all":        {0, 1, 2, 3, 4, 5, 6, 7},
+        }
+        need = _need.get(sim_type, {0, 1, 2, 3, 4, 5, 6, 7})
+
+        def _load_or_build(name, build_fn, index):
+            if index not in need:
+                print(f"   ⏭️  Skip {name} (khong can cho sim_type='{sim_type}')")
+                return None
             cache_path = os.path.join(self.path, f"s_{name}.npz")
             try:
                 t0 = time()
@@ -442,24 +449,19 @@ class Data:
                 raw = build_fn()
                 mat = self.normalized_sym(raw)
                 sp.save_npz(cache_path, mat)
-                print(f"   🔨 Built {name} {mat.shape}  ({time() - t0:.1f}s)")
+                print(f"   🔨 Built  {name} {mat.shape}  ({time() - t0:.1f}s)")
                 return mat
 
-        interaction = _load_or_build("interaction_adj_mat", self.create_interaction_adj_mat)
-        social = _load_or_build("social_adj_mat", self.create_social_adj_mat)
-        similar_users = _load_or_build("similar_users_adj_mat", self.create_similar_adj_mat)
-        tfidf_item = _load_or_build("tfidf_item_similarity_adj_mat", self.create_tfidf_similarity_matrix)
-        bert_item = _load_or_build("bert_item_similarity_adj_mat", self.create_bert_similarity_matrix)
-        full_bert_item = _load_or_build("full_bert_item_similarity_adj_mat", self.create_full_bert_similarity_matrix)
-        multimodal = _load_or_build(
-            "multimodal_similarity_adj_mat",
-            # use default multimodal settings; pca_components is only used when method='pca'
-            lambda: self.create_multimodal_similarity_matrix(method="late_fusion", alpha=0.5),
-        )
-        img_only = _load_or_build(
-            "img_similarity_adj_mat",
-            lambda: self.create_img_similarity_matrix(threshold=0.5),
-        )
+        interaction   = _load_or_build("interaction_adj_mat",              self.create_interaction_adj_mat,           0)
+        social        = _load_or_build("social_adj_mat",                    self.create_social_adj_mat,                1)
+        similar_users = _load_or_build("similar_users_adj_mat",             self.create_similar_adj_mat,               2)
+        tfidf_item    = _load_or_build("tfidf_item_similarity_adj_mat",     self.create_tfidf_similarity_matrix,       3)
+        bert_item     = _load_or_build("bert_item_similarity_adj_mat",      self.create_bert_similarity_matrix,        4)
+        full_bert_item= _load_or_build("full_bert_item_similarity_adj_mat", self.create_full_bert_similarity_matrix,   5)
+        multimodal    = _load_or_build("multimodal_similarity_adj_mat",
+                                       lambda: self.create_multimodal_similarity_matrix(method="late_fusion", alpha=0.5), 6)
+        img_only      = _load_or_build("img_similarity_adj_mat",
+                                       lambda: self.create_img_similarity_matrix(threshold=0.5),                       7)
 
         return (interaction, social, similar_users,
                 tfidf_item, bert_item, full_bert_item,
