@@ -32,7 +32,7 @@ python3 train.py \
     --epoch 500 \
     --eval_interval 20 \
     --early_stop_steps 0 \
-    --Ks "[1,5,10,20,50]" \
+    --Ks "[1,5,10,20]" \
     --verbose 1 \
     --save_flag 1 \
     --checkpoint_interval 100 \

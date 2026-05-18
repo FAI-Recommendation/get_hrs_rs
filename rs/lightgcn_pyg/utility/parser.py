@@ -44,7 +44,7 @@ def parse_args():
                         help="Evaluation user batch size.")
 
     # ── Evaluation ──
-    parser.add_argument("--Ks", nargs="?", default="[1,5,10,20,50]",
+    parser.add_argument("--Ks", nargs="?", default="[1,5,10,20]",
                         help="Top k(s) recommend")
     parser.add_argument("--eval_interval", type=int, default=10,
                         help="Evaluate every N epochs")
