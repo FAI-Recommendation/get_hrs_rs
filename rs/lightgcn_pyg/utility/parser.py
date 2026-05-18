@@ -76,8 +76,8 @@ def parse_args():
     # ── Wandb (optional) ──
     parser.add_argument("--use_wandb", type=int, default=0,
                         help="0: Disable wandb, 1: Enable wandb logging")
-    parser.add_argument("--wandb_project", type=str, default="combigcn-rs",
-                        help="Wandb project name")
+    parser.add_argument("--wandb_project", type=str, default="",
+                        help="Wandb project name (doc tu WANDB_PROJECT env neu de trong)")
     parser.add_argument("--wandb_entity", type=str, default="",
                         help="Wandb entity/team name (de trong neu dung personal account)")
     parser.add_argument("--wandb_run_name", type=str, default="",
