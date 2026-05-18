@@ -300,14 +300,6 @@ def main():
 
         t_eval = time()
 
-        # Evaluate on train set
-        ret_train = test(
-            model, interaction_adj, similarity_adj, data,
-            Ks, device, batch_size=args.eval_batch_size, train_set_flag=1,
-        )
-        print(f"\n📈 Epoch {epoch} — TRAIN metrics:")
-        print(format_metrics(ret_train, Ks))
-
         # Evaluate on test set
         ret_test = test(
             model, interaction_adj, similarity_adj, data,
