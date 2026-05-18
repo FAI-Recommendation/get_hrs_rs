@@ -23,3 +23,4 @@ report/v2/weights
 rs/lightgcn_pyg/weights
 rs/lightgcn_pyg/tensorboard
 rs/lightgcn_pyg/wandb
+rs/lightgcn_pyg/output
