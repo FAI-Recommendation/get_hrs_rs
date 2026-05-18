@@ -57,14 +57,14 @@ def format_metrics(ret, Ks):
 # ─────────────────────────────────────────────
 # Push best model to HuggingFace Hub
 # ─────────────────────────────────────────────
-def push_to_hf(local_path, hf_repo_id, epoch, recall_score, sim_type="none"):
+def push_folder_to_hf(local_dir, hf_repo_id, sim_type, best_epoch, recall_score):
     """
-    Push best_model.pt to HuggingFace Hub theo sim_type riêng biệt.
+    Push toàn bộ thư mục weights (best_model.pt + checkpoints) lên HF sau khi training xong.
     Cấu trúc trên HF repo:
       none/best_model.pt
-      img_only/best_model.pt
-      multimodal/best_model.pt
-      tfidf/best_model.pt
+      none/checkpoint_epoch200.pt
+      none/checkpoint_epoch400.pt
+      ...
     """
     if not HF_AVAILABLE:
         print("   ⚠️  huggingface_hub not installed. Skipping HF push.")
@@ -75,21 +75,15 @@ def push_to_hf(local_path, hf_repo_id, epoch, recall_score, sim_type="none"):
         return
     try:
         api = HfApi(token=hf_token)
-        api.create_repo(
+        api.create_repo(repo_id=hf_repo_id, repo_type="model", exist_ok=True, private=True)
+        api.upload_folder(
+            folder_path=local_dir,
+            path_in_repo=sim_type,
             repo_id=hf_repo_id,
             repo_type="model",
-            exist_ok=True,
-            private=True,
+            commit_message=f"[{sim_type}] Final upload — best epoch={best_epoch} recall@K={recall_score:.5f}",
         )
-        path_in_repo = f"{sim_type}/best_model.pt"
-        api.upload_file(
-            path_or_fileobj=local_path,
-            path_in_repo=path_in_repo,
-            repo_id=hf_repo_id,
-            repo_type="model",
-            commit_message=f"[{sim_type}] Best model epoch={epoch} recall@K={recall_score:.5f}",
-        )
-        print(f"   🤗 Pushed to HF Hub: https://huggingface.co/{hf_repo_id}/blob/main/{path_in_repo}")
+        print(f"   🤗 Pushed folder to HF Hub: https://huggingface.co/{hf_repo_id}/tree/main/{sim_type}")
     except Exception as e:
         print(f"   ⚠️  HF push failed: {e}")
 
@@ -367,16 +361,6 @@ def main():
             }, best_model_path)
             print(f"   💾 Saved best model at epoch {epoch}")
 
-            # ── HuggingFace Hub push ──
-            if args.use_hf and args.hf_repo_id:
-                push_to_hf(
-                    local_path=best_model_path,
-                    hf_repo_id=args.hf_repo_id,
-                    epoch=epoch,
-                    recall_score=ret_test["recall"][0],
-                    sim_type=args.sim_type,
-                )
-
         if should_stop:
             print(f"\n⏹️  Early stopping triggered at epoch {epoch}.")
             break
@@ -428,6 +412,36 @@ def main():
                 f"  mrr=[{', '.join([f'{r:.5f}' for r in mrrs[best_idx]])}]\n\n"
             )
         print(f"📄 Results saved to: {result_path}")
+
+        # ── Save best_metrics.json vào weights folder ──
+        if args.save_flag and weights_dir:
+            import json
+            metrics_path = os.path.join(weights_dir, "best_metrics.json")
+            with open(metrics_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "best_epoch":  best_eval_epoch,
+                    "sim_type":    args.sim_type,
+                    "Ks":          Ks,
+                    "recall":      [round(float(v), 6) for v in recs[best_idx]],
+                    "precision":   [round(float(v), 6) for v in pres[best_idx]],
+                    "ndcg":        [round(float(v), 6) for v in ndcgs[best_idx]],
+                    "hit_ratio":   [round(float(v), 6) for v in hits[best_idx]],
+                    "mrr":         [round(float(v), 6) for v in mrrs[best_idx]],
+                    "args": {k: v for k, v in vars(args).items()
+                             if isinstance(v, (int, float, str, bool, list))},
+                }, f, indent=2, ensure_ascii=False)
+            print(f"📊 Best metrics saved to: {metrics_path}")
+
+        # ── HuggingFace: push toàn bộ weights folder 1 lần sau khi xong ──
+        if args.use_hf and args.hf_repo_id and args.save_flag and weights_dir:
+            print(f"\n🤗 Pushing weights to HuggingFace Hub...")
+            push_folder_to_hf(
+                local_dir=weights_dir,
+                hf_repo_id=args.hf_repo_id,
+                sim_type=args.sim_type,
+                best_epoch=best_eval_epoch,
+                recall_score=float(recs[best_idx][0]),
+            )
     else:
         if use_wandb:
             wandb.finish()

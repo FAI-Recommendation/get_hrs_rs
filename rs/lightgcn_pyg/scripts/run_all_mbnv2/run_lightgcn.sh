@@ -26,6 +26,7 @@ python3 train.py \
     --dataset "" \
     --sim_type none \
     --wandb_run_name none_layers4_dim512_lr0.001_reg1e-05_mbnv2 \
+    --hf_repo_id "$HF_REPO_ID_MBNV2" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
     --lr 0.001 \
@@ -37,7 +38,7 @@ python3 train.py \
     --Ks "[1,5,10,20,50]" \
     --verbose 1 \
     --save_flag 1 \
-    --checkpoint_interval 100 \
+    --checkpoint_interval 200 \
     --weights_path weights/ \
     --output_path output/ \
     --gpu_id 0
