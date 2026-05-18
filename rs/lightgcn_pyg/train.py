@@ -417,18 +417,25 @@ def main():
         if args.save_flag and weights_dir:
             import json
             metrics_path = os.path.join(weights_dir, "best_metrics.json")
+            def _to_python(v):
+                if isinstance(v, (np.integer,)): return int(v)
+                if isinstance(v, (np.floating,)): return float(v)
+                if isinstance(v, np.ndarray): return v.tolist()
+                return v
+
             with open(metrics_path, "w", encoding="utf-8") as f:
                 json.dump({
-                    "best_epoch":  best_eval_epoch,
+                    "best_epoch":  int(best_eval_epoch),
                     "sim_type":    args.sim_type,
-                    "Ks":          Ks,
+                    "Ks":          [int(k) for k in Ks],
                     "recall":      [round(float(v), 6) for v in recs[best_idx]],
                     "precision":   [round(float(v), 6) for v in pres[best_idx]],
                     "ndcg":        [round(float(v), 6) for v in ndcgs[best_idx]],
                     "hit_ratio":   [round(float(v), 6) for v in hits[best_idx]],
                     "mrr":         [round(float(v), 6) for v in mrrs[best_idx]],
-                    "args": {k: v for k, v in vars(args).items()
-                             if isinstance(v, (int, float, str, bool, list))},
+                    "args": {k: _to_python(v) for k, v in vars(args).items()
+                             if isinstance(v, (int, float, str, bool, list,
+                                               np.integer, np.floating))},
                 }, f, indent=2, ensure_ascii=False)
             print(f"📊 Best metrics saved to: {metrics_path}")
 
