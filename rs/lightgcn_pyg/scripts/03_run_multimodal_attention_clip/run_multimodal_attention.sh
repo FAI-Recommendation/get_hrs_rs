@@ -1,7 +1,9 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# FULL RUN: CombiGCN + Image Only similarity
-# Tương đương: hr/LightGCN_only_img.py
+# FULL RUN: CombiGCN + Multimodal (Weight Attention Fusion)
+# Data: CLIP embeddings (clip_10k_sample)
+# Fusion: WeightedAttention (MultiHeadAttention + Linear projection)
+# Ref: rs/Docs/06_ket_qua_mo_hinh.md
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -23,19 +25,22 @@ done
 python3 train.py \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
-    --sim_type img_only \
+    --sim_type multimodal \
+    --multimodal_method attention \
+    --wandb_run_name multimodal_attention_layers4_dim512_lr0.001_reg1e-04_clip \
+    --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
     --lr 0.001 \
-    --regs "[1e-5]" \
+    --regs "[1e-4]" \
     --batch_size 8192 \
-    --epoch 500 \
-    --eval_interval 20 \
+    --epoch 1000 \
+    --eval_interval 40 \
     --early_stop_steps 0 \
     --Ks "[1,5,10,20]" \
     --verbose 1 \
     --save_flag 1 \
-    --checkpoint_interval 100 \
+    --checkpoint_interval 200 \
     --weights_path weights/ \
     --output_path output/ \
     --gpu_id 0

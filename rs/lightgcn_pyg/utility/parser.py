@@ -89,6 +89,11 @@ def parse_args():
     parser.add_argument("--hf_repo_id", type=str, default="",
                         help="HuggingFace repo id, vd: YourOrg/combigcn-fashion-rs")
 
+    # ── Multimodal fusion method (optional) ──
+    parser.add_argument("--multimodal_method", type=str, default="",
+                        help="Fusion method cho sim_type=multimodal: late_fusion | aggregation | pca | attention "
+                             "(doc tu MULTIMODAL_METHOD env neu de trong)")
+
     # ── Compat (giữ lại cho tương thích) ──
     parser.add_argument("--model_type", nargs="?", default="combigcn",
                         help="Specify the name of model.")

@@ -332,7 +332,16 @@ class Data:
             combined_sim = alpha * text_sim + (1 - alpha) * img_sim
 
         elif method == "aggregation":
-            combined_emb = (text_embeddings + image_embeddings) / 2
+            text_dim = text_embeddings.shape[1]
+            img_dim  = image_embeddings.shape[1]
+            if text_dim != img_dim:
+                # Project img → text_dim truoc khi average (CLIP: 512→768)
+                proj = nn.Linear(img_dim, text_dim)
+                with torch.no_grad():
+                    img_proj = proj(torch.tensor(image_embeddings)).numpy()
+            else:
+                img_proj = image_embeddings
+            combined_emb = (text_embeddings + img_proj) / 2
             combined_sim = cosine_sim_gpu(combined_emb)
 
         elif method == "pca":
@@ -359,16 +368,32 @@ class Data:
             combined_sim = cosine_sim_gpu(reduced)
 
         elif method == "attention":
+            text_dim = text_embeddings.shape[1]   # BERT = 768
+            img_dim  = image_embeddings.shape[1]  # CLIP=512, mbnv2=768/1280
+
             text_tensor = torch.tensor(text_embeddings, dtype=torch.float32)
-            img_tensor = torch.tensor(image_embeddings, dtype=torch.float32)
-            embed_dim = text_embeddings.shape[1]
+            img_tensor  = torch.tensor(image_embeddings, dtype=torch.float32)
 
-            mha = MultiHeadAttention(embed_dim=embed_dim, num_heads=8)
-            text_att = mha(text_tensor, text_tensor, text_tensor)
-            img_att = mha(img_tensor, img_tensor, img_tensor)
+            # Fix Bug: project img → text_dim neu khac nhau (CLIP: 512→768)
+            if img_dim != text_dim:
+                proj = nn.Linear(img_dim, text_dim)
+                with torch.no_grad():
+                    img_tensor = proj(img_tensor)
+                print(f"   Projected img_dim {img_dim} → {text_dim}")
 
-            wa = WeightedAttention(embed_dim=embed_dim)
-            combined_emb = wa(text_att, img_att)
+            # Fix Bug: nn.MultiheadAttention can input 3D (seq_len, batch, embed_dim)
+            # Treat moi item la 1 sequence element: (N,dim) → (N,1,dim)
+            text_3d = text_tensor.unsqueeze(1)   # (N, 1, text_dim)
+            img_3d  = img_tensor.unsqueeze(1)    # (N, 1, text_dim)
+
+            mha = MultiHeadAttention(embed_dim=text_dim, num_heads=8)
+            with torch.no_grad():
+                text_att = mha(text_3d, text_3d, text_3d).squeeze(1)  # (N, text_dim)
+                img_att  = mha(img_3d,  img_3d,  img_3d ).squeeze(1)  # (N, text_dim)
+
+            wa = WeightedAttention(embed_dim=text_dim)
+            with torch.no_grad():
+                combined_emb = wa(text_att, img_att)                   # (N, text_dim)
             combined_sim = cosine_sim_gpu(combined_emb.detach().numpy())
         else:
             raise ValueError(f"method '{method}' không hợp lệ.")
@@ -437,7 +462,7 @@ class Data:
     # ─────────────────────────────────────────
     # get_norm_adj_mat — build / cache tất cả adj matrices
     # ─────────────────────────────────────────
-    def get_norm_adj_mat(self, sim_type="all"):
+    def get_norm_adj_mat(self, sim_type="all", multimodal_method=None):
         """
         Tra ve 8 normalized adjacency matrices (scipy.sparse):
           0: interaction, 1: social, 2: similar_users,
@@ -452,7 +477,18 @@ class Data:
           "multimodal" → build 0 + 6
           "img_only"   → build 0 + 7
           "all"        → build tat ca (mac dinh cu)
+
+        multimodal_method: phuong phap fusion cho sim_type="multimodal"
+          None → doc tu env MULTIMODAL_METHOD, fallback "late_fusion"
+          Moi method → NPZ cache rieng:
+            late_fusion  → s_multimodal_late_fusion_similarity_adj_mat.npz
+            attention    → s_multimodal_attention_similarity_adj_mat.npz
+            aggregation  → s_multimodal_aggregation_similarity_adj_mat.npz
+            pca          → s_multimodal_pca_similarity_adj_mat.npz
         """
+        # Resolve multimodal_method
+        if multimodal_method is None:
+            multimodal_method = os.environ.get("MULTIMODAL_METHOD", "late_fusion").strip() or "late_fusion"
         # Map sim_type → index can build (ngoai index 0 luon build)
         # Index nao can build (0 = interaction luon can)
         _need = {
@@ -490,8 +526,9 @@ class Data:
         tfidf_item    = _load_or_build("tfidf_item_similarity_adj_mat",     self.create_tfidf_similarity_matrix,       3)
         bert_item     = _load_or_build("bert_item_similarity_adj_mat",      self.create_bert_similarity_matrix,        4)
         full_bert_item= _load_or_build("full_bert_item_similarity_adj_mat", self.create_full_bert_similarity_matrix,   5)
-        multimodal    = _load_or_build("multimodal_similarity_adj_mat",
-                                       lambda: self.create_multimodal_similarity_matrix(method="late_fusion", alpha=0.5), 6)
+        _mm = multimodal_method  # capture cho lambda
+        multimodal    = _load_or_build(f"multimodal_{_mm}_similarity_adj_mat",
+                                       lambda: self.create_multimodal_similarity_matrix(method=_mm, alpha=0.5), 6)
         img_only      = _load_or_build("img_similarity_adj_mat",
                                        lambda: self.create_img_similarity_matrix(threshold=0.5),                       7)
 

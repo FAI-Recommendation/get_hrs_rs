@@ -129,7 +129,14 @@ def main():
     # ── Build adjacency matrices ──
     print(f"\n🔨 Building adjacency matrices ...")
     t1 = time()
-    matrices = data.get_norm_adj_mat(sim_type=args.sim_type)
+    multimodal_method = (
+        args.multimodal_method.strip()
+        or os.environ.get("MULTIMODAL_METHOD", "late_fusion").strip()
+        or "late_fusion"
+    )
+    if args.sim_type == "multimodal":
+        print(f"   Multimodal method: {multimodal_method}")
+    matrices = data.get_norm_adj_mat(sim_type=args.sim_type, multimodal_method=multimodal_method)
     interaction_adj = scipy_to_sparse_tensor(matrices[0], device=device)
 
     if args.sim_type == "none":

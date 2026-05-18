@@ -2,7 +2,7 @@
 
 ## Metric đánh giá
 
-- **k = 1, 3, 5, 10** (Top-K recommendation)
+- **k = 1, 5, 10, 20** (Top-K recommendation)
 - **Recall@K**, **NDCG@K**
 
 ---
