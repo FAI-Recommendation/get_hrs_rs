@@ -319,9 +319,9 @@ def main():
 
         # ── TensorBoard: metrics ──
         for metric in ["recall", "precision", "ndcg", "mrr", "hit_ratio"]:
-            if len(ret_test[metric]) > 0:
-                writer.add_scalar(f"test/{metric}@{Ks[0]}", ret_test[metric][0], epoch)
-                writer.add_scalar(f"test/{metric}@{Ks[-1]}", ret_test[metric][-1], epoch)
+            for i, k in enumerate(Ks):
+                if i < len(ret_test[metric]):
+                    writer.add_scalar(f"test/{metric}@{k}", ret_test[metric][i], epoch)
 
         # ── Wandb: metrics ──
         if use_wandb:
