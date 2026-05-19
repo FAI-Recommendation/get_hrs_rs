@@ -27,7 +27,7 @@ from utility.load_data import Data
 from utility.parser import parse_args
 from utility.helper import early_stopping, ensureDir
 from utility.batch_test import test
-from model import CombiGCN, scipy_to_sparse_tensor
+from models import CombiGCN, BM3, FREEDOM, scipy_to_sparse_tensor
 
 # Optional dependencies
 try:
@@ -134,35 +134,85 @@ def main():
         or os.environ.get("MULTIMODAL_METHOD", "late_fusion").strip()
         or "late_fusion"
     )
-    if args.sim_type == "multimodal":
-        print(f"   Multimodal method: {multimodal_method}")
-    matrices = data.get_norm_adj_mat(sim_type=args.sim_type, multimodal_method=multimodal_method)
-    interaction_adj = scipy_to_sparse_tensor(matrices[0], device=device)
 
-    if args.sim_type == "none":
-        similarity_adj = None
-        print(f"   Mode: LightGCN thuan (no similarity graph)")
+    model_name = args.model.lower()
+
+    if model_name == "combigcn":
+        if args.sim_type == "multimodal":
+            print(f"   Multimodal method: {multimodal_method}")
+        matrices = data.get_norm_adj_mat(sim_type=args.sim_type, multimodal_method=multimodal_method)
+        interaction_adj = scipy_to_sparse_tensor(matrices[0], device=device)
+        if args.sim_type == "none":
+            similarity_adj = None
+            print(f"   CombiGCN mode: LightGCN thuan (no similarity graph)")
+        else:
+            sim_map = {
+                "tfidf":      matrices[3],
+                "bert":       matrices[4],
+                "full_bert":  matrices[5],
+                "multimodal": matrices[6],
+                "img_only":   matrices[7],
+            }
+            similarity_adj = scipy_to_sparse_tensor(sim_map[args.sim_type], device=device)
+            print(f"   CombiGCN mode: similarity_type={args.sim_type}")
     else:
-        sim_map = {
-            "tfidf":      matrices[3],
-            "bert":       matrices[4],
-            "full_bert":  matrices[5],
-            "multimodal": matrices[6],
-            "img_only":   matrices[7],
-        }
-        similarity_adj = scipy_to_sparse_tensor(sim_map[args.sim_type], device=device)
-        print(f"   Mode: CombiGCN with similarity_type={args.sim_type}")
+        # BM3 / FREEDOM: chỉ cần interaction graph + raw embeddings
+        matrices = data.get_norm_adj_mat(sim_type="none", multimodal_method=multimodal_method)
+        interaction_adj = scipy_to_sparse_tensor(matrices[0], device=device)
+        similarity_adj = None
+        print(f"   {model_name.upper()} mode: interaction graph only (raw embeddings used internally)")
     print(f"   Built in {time() - t1:.1f}s")
 
+    # ── Load raw embeddings (BM3 / FREEDOM) ──
+    image_feats = text_feats = None
+    if model_name in ("bm3", "freedom"):
+        print(f"\n📦 Loading raw embeddings for {model_name.upper()} ...")
+        image_feats, text_feats = data.get_raw_embeddings()
+        image_feats = image_feats.to(device)
+        text_feats = text_feats.to(device)
+
     # ── Create model ──
-    model = CombiGCN(
-        n_users=n_users,
-        n_items=n_items,
-        embedding_dim=args.embed_size,
-        n_layers=n_layers,
-        decay=decay,
-        node_dropout=eval(args.node_dropout)[0] if args.node_dropout_flag else 0.0,
-    ).to(device)
+    node_dropout = eval(args.node_dropout)[0] if args.node_dropout_flag else 0.0
+
+    if model_name == "combigcn":
+        model = CombiGCN(
+            n_users=n_users,
+            n_items=n_items,
+            embedding_dim=args.embed_size,
+            n_layers=n_layers,
+            decay=decay,
+            node_dropout=node_dropout,
+        ).to(device)
+    elif model_name == "bm3":
+        model = BM3(
+            n_users=n_users,
+            n_items=n_items,
+            image_feats=image_feats,
+            text_feats=text_feats,
+            embedding_dim=args.embed_size,
+            n_layers=n_layers,
+            decay=decay,
+            dropout=node_dropout,
+            momentum=args.bm3_momentum,
+            cl_weight=args.bm3_cl_weight,
+        ).to(device)
+    elif model_name == "freedom":
+        model = FREEDOM(
+            n_users=n_users,
+            n_items=n_items,
+            image_feats=image_feats,
+            text_feats=text_feats,
+            embedding_dim=args.embed_size,
+            n_layers=n_layers,
+            decay=decay,
+            dropout=node_dropout,
+            knn_k=args.freedom_knn_k,
+            cl_weight=args.freedom_cl_weight,
+            cl_temp=args.freedom_cl_temp,
+        ).to(device)
+    else:
+        raise ValueError(f"Unknown model: {model_name}")
+
     print(f"\n🏗️  Model: {model}")
 
     # ── torch.compile disabled: không tương thích với torch_sparse custom kernels ──
@@ -176,8 +226,12 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # ── Run name (dung cho ca TensorBoard, wandb) ──
+    if model_name == "combigcn":
+        model_tag = f"combigcn_{args.sim_type}"
+    else:
+        model_tag = f"{model_name}_{args.embed_type}"
     run_name = args.wandb_run_name or (
-        f"{args.sim_type}_layers{n_layers}_dim{args.embed_size}_lr{args.lr}_reg{decay}"
+        f"{model_tag}_layers{n_layers}_dim{args.embed_size}_lr{args.lr}_reg{decay}"
     )
 
     # ── TensorBoard (luon bat) ──
@@ -199,7 +253,9 @@ def main():
                 entity=args.wandb_entity or None,
                 name=run_name,
                 config={
-                    "sim_type":   args.sim_type,
+                    "model":      model_name,
+                    "sim_type":   args.sim_type if model_name == "combigcn" else "n/a",
+                    "embed_type": args.embed_type if model_name != "combigcn" else "n/a",
                     "embed_size": args.embed_size,
                     "n_layers":   n_layers,
                     "lr":         args.lr,
@@ -215,7 +271,7 @@ def main():
     weights_dir = None
     if args.save_flag:
         weights_dir = os.path.join(
-            args.weights_path, args.sim_type,
+            args.weights_path, model_tag,
             f"layers_{n_layers}_dim_{args.embed_size}",
             f"lr_{args.lr}_reg_{decay}",
         )
@@ -255,10 +311,16 @@ def main():
 
             optimizer.zero_grad()
             with torch.cuda.amp.autocast(enabled=use_amp):
-                loss, mf_loss, reg_loss = model(
-                    interaction_adj, similarity_adj,
-                    users_t, pos_t, neg_t,
-                )
+                if model_name == "combigcn":
+                    loss, mf_loss, reg_loss = model(
+                        interaction_adj, similarity_adj,
+                        users_t, pos_t, neg_t,
+                    )
+                else:
+                    loss, mf_loss, reg_loss = model(
+                        interaction_adj,
+                        users_t, pos_t, neg_t,
+                    )
 
             if scaler:
                 scaler.scale(loss).backward()
@@ -404,14 +466,15 @@ def main():
             wandb.finish()
 
         # ── Save result to file ──
-        result_dir = os.path.join(args.output_path, args.sim_type)
+        result_dir = os.path.join(args.output_path, model_tag)
         os.makedirs(result_dir, exist_ok=True)
-        result_path = os.path.join(result_dir, "combigcn.result")
+        result_path = os.path.join(result_dir, f"{model_name}.result")
         with open(result_path, "a") as f:
             f.write(
                 f"embed_size={args.embed_size}, lr={args.lr}, "
                 f"n_layers={n_layers}, node_dropout={args.node_dropout}, "
-                f"regs={args.regs}, sim_type={args.sim_type}\n"
+                f"regs={args.regs}, model={model_name}, "
+                f"sim_type={args.sim_type if model_name == 'combigcn' else 'n/a'}\n"
                 f"  recall=[{', '.join([f'{r:.5f}' for r in recs[best_idx]])}]\n"
                 f"  precision=[{', '.join([f'{r:.5f}' for r in pres[best_idx]])}]\n"
                 f"  ndcg=[{', '.join([f'{r:.5f}' for r in ndcgs[best_idx]])}]\n"
@@ -433,7 +496,8 @@ def main():
             with open(metrics_path, "w", encoding="utf-8") as f:
                 json.dump({
                     "best_epoch":  int(best_eval_epoch),
-                    "sim_type":    args.sim_type,
+                    "model":       model_name,
+                    "model_tag":   model_tag,
                     "Ks":          [int(k) for k in Ks],
                     "recall":      [round(float(v), 6) for v in recs[best_idx]],
                     "precision":   [round(float(v), 6) for v in pres[best_idx]],
@@ -452,7 +516,7 @@ def main():
             push_folder_to_hf(
                 local_dir=weights_dir,
                 hf_repo_id=args.hf_repo_id,
-                sim_type=args.sim_type,
+                sim_type=model_tag,
                 best_epoch=best_eval_epoch,
                 recall_score=float(recs[best_idx][0]),
             )

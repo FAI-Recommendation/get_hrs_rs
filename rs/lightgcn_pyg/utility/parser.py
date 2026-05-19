@@ -1,14 +1,23 @@
 """
-parser.py — Argument parser cho CombiGCN (PyG)
-================================================
-Convert từ hr/utility/parser.py — giữ tương thích args cũ + thêm --sim_type.
+parser.py — Argument parser (PyG)
+===================================
+Hỗ trợ 3 models: combigcn | bm3 | freedom
 """
 
 import argparse
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train CombiGCN (PyG)")
+    parser = argparse.ArgumentParser(description="Train recommendation model (PyG)")
+
+    # ── Model selection ──
+    parser.add_argument("--model", type=str, default="combigcn",
+                        choices=["combigcn", "bm3", "freedom"],
+                        help="Model: combigcn | bm3 | freedom")
+    parser.add_argument("--embed_type", type=str, default="clip",
+                        choices=["clip", "mbnv2"],
+                        help="Image encoder type (cho bm3/freedom): clip | mbnv2. "
+                             "Chỉ ảnh hưởng đến tên run/log, data_path vẫn cần trỏ đúng folder.")
 
     # ── Data ──
     parser.add_argument("--data_path", nargs="?", default="Data/",
@@ -17,7 +26,7 @@ def parse_args():
                         help="Choose a dataset folder name.")
     parser.add_argument("--sim_type", type=str, default="img_only",
                         choices=["none", "multimodal", "img_only", "tfidf", "bert", "full_bert"],
-                        help="Similarity type: none=LightGCN thuần, khác=CombiGCN")
+                        help="(CombiGCN only) Similarity type: none=LightGCN thuần, khác=CombiGCN")
 
     # ── Model ──
     parser.add_argument("--embed_size", type=int, default=64,
@@ -89,10 +98,24 @@ def parse_args():
     parser.add_argument("--hf_repo_id", type=str, default="",
                         help="HuggingFace repo id, vd: YourOrg/combigcn-fashion-rs")
 
-    # ── Multimodal fusion method (optional) ──
+    # ── Multimodal fusion method (optional, CombiGCN only) ──
     parser.add_argument("--multimodal_method", type=str, default="",
                         help="Fusion method cho sim_type=multimodal: late_fusion | aggregation | pca | attention "
                              "(doc tu MULTIMODAL_METHOD env neu de trong)")
+
+    # ── BM3 hyperparams ──
+    parser.add_argument("--bm3_momentum", type=float, default=0.995,
+                        help="(BM3) EMA momentum cho target encoder")
+    parser.add_argument("--bm3_cl_weight", type=float, default=0.2,
+                        help="(BM3) Weight của bootstrap contrastive loss")
+
+    # ── FREEDOM hyperparams ──
+    parser.add_argument("--freedom_knn_k", type=int, default=10,
+                        help="(FREEDOM) Số neighbors khi xây item-item graph")
+    parser.add_argument("--freedom_cl_weight", type=float, default=0.1,
+                        help="(FREEDOM) Weight của InfoNCE contrastive loss")
+    parser.add_argument("--freedom_cl_temp", type=float, default=0.2,
+                        help="(FREEDOM) Temperature cho InfoNCE")
 
     # ── Compat (giữ lại cho tương thích) ──
     parser.add_argument("--model_type", nargs="?", default="combigcn",

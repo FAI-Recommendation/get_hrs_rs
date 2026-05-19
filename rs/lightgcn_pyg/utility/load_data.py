@@ -609,6 +609,38 @@ class Data:
     def get_num_users_items(self):
         return self.n_users, self.n_items
 
+    def get_raw_embeddings(self) -> tuple:
+        """
+        Trả về (image_feats, text_feats) dưới dạng torch.Tensor float32.
+        Dùng cho BM3 và FREEDOM — cần raw embeddings, không phải similarity matrix.
+
+        Expects:
+            {data_path}/image_embeddings.npy  — shape [n_items, img_dim]
+            {data_path}/text_embeddings.npy   — shape [n_items, txt_dim]
+        """
+        img_path = os.path.join(self.path, "image_embeddings.npy")
+        txt_path = os.path.join(self.path, "text_embeddings.npy")
+
+        if not os.path.exists(img_path):
+            raise FileNotFoundError(f"image_embeddings.npy not found at {img_path}")
+        if not os.path.exists(txt_path):
+            raise FileNotFoundError(f"text_embeddings.npy not found at {txt_path}")
+
+        image_feats = torch.tensor(np.load(img_path), dtype=torch.float32)
+        text_feats = torch.tensor(np.load(txt_path), dtype=torch.float32)
+
+        if image_feats.shape[0] != self.n_items:
+            raise ValueError(
+                f"image_embeddings rows ({image_feats.shape[0]}) != n_items ({self.n_items})"
+            )
+        if text_feats.shape[0] != self.n_items:
+            raise ValueError(
+                f"text_embeddings rows ({text_feats.shape[0]}) != n_items ({self.n_items})"
+            )
+
+        print(f"   image_feats: {tuple(image_feats.shape)}, text_feats: {tuple(text_feats.shape)}")
+        return image_feats, text_feats
+
     def print_statistics(self):
         print(f"   n_users={self.n_users}, n_items={self.n_items}")
         print(f"   n_interactions={self.n_train + self.n_test}")
