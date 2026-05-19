@@ -15,8 +15,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 WANDB_API_KEY = os.environ["WANDB_API_KEY"]
 WANDB_ENTITY  = os.environ["WANDB_ENTITY"]
-WANDB_PROJECT = os.environ["WANDB_PROJECT"]
-OUT_DIR       = Path(__file__).parent.parent / "report" / "v2_wandb"
+WANDB_PROJECT = "combigcn-rs-1000ep"
+OUT_DIR       = Path(__file__).parent.parent / "data_evaluate" / "data_wandb"
 
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
