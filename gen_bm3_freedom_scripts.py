@@ -45,9 +45,17 @@ BM3_EXTRA_TEST = "    --bm3_momentum 0.995 \\\n    --bm3_cl_weight 0.2 \\"
 FREE_EXTRA_RUN  = "    --freedom_knn_k 10 \\\n    --freedom_cl_weight 0.1 \\\n    --freedom_cl_temp 0.2 \\"
 FREE_EXTRA_TEST = "    --freedom_knn_k 10 \\\n    --freedom_cl_weight 0.1 \\\n    --freedom_cl_temp 0.2 \\"
 
+HF_VAR = {
+    ("bm3",     "clip"):  "HF_REPO_ID_BM3_CLIP",
+    ("bm3",     "mbnv2"): "HF_REPO_ID_BM3_MBNV2",
+    ("freedom", "clip"):  "HF_REPO_ID_FREEDOM_CLIP",
+    ("freedom", "mbnv2"): "HF_REPO_ID_FREEDOM_MBNV2",
+}
+
 def make_run(model, embed_type, data_path, sim_type):
     extra = BM3_EXTRA_RUN if model == "bm3" else FREE_EXTRA_RUN
     run_name = f"{model}_{sim_type}_layers4_dim512_lr0.001_reg1e-04_{embed_type}"
+    hf_var = HF_VAR[(model, embed_type)]
     return f"""\
 #!/bin/bash
 # ─────────────────────────────────────────────
@@ -68,7 +76,7 @@ python3 train.py \\
     --data_path {data_path} \\
     --dataset "" \\
     --wandb_run_name {run_name} \\
-    --hf_repo_id "$HF_REPO_ID" \\
+    --hf_repo_id "${hf_var}" \\
     --embed_size 512 \\
     --layer_size "[512,512,512,512]" \\
     --lr 0.001 \\
