@@ -25,8 +25,8 @@ def parse_args():
     parser.add_argument("--dataset", nargs="?", default="clip_10k_sample",
                         help="Choose a dataset folder name.")
     parser.add_argument("--sim_type", type=str, default="img_only",
-                        choices=["none", "multimodal", "img_only", "tfidf", "bert", "full_bert"],
-                        help="(CombiGCN only) Similarity type: none=LightGCN thuần, khác=CombiGCN")
+                        choices=["none", "multimodal", "multimodal_attention", "img_only", "tfidf", "bert", "full_bert"],
+                        help="Similarity/fusion type: none=LightGCN thuần, img_only/tfidf/multimodal/multimodal_attention dùng cho BM3/FREEDOM/CombiGCN")
 
     # ── Model ──
     parser.add_argument("--embed_size", type=int, default=64,
