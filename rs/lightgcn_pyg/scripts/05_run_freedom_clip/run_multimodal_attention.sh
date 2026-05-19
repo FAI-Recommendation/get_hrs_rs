@@ -27,7 +27,7 @@ python3 train.py \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
     --wandb_run_name freedom_multimodal_attention_layers4_dim512_lr0.001_reg1e-04_clip \
-    --hf_repo_id "$HF_REPO_ID" \
+    --hf_repo_id "$HF_REPO_ID_FREEDOM_CLIP" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
     --lr 0.001 \
