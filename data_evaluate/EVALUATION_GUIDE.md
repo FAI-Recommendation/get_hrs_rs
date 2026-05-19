@@ -1,6 +1,6 @@
 # Evaluation Guide — So sánh Models cho Chuyên đề 2
 
-Notebook `evaluate.ipynb` đánh giá và so sánh hiệu năng của các mô hình gợi ý (recommendation) dựa trên dữ liệu từ WandB. Phân tích đi từ **tổng quan** → **phân tách theo encoder** → **ablation từng model** → **so sánh trực tiếp best-vs-best**.
+Notebook `evaluate.ipynb` đánh giá và so sánh hiệu năng của các mô hình gợi ý (recommendation) dựa trên dữ liệu từ WandB. Phân tích đi từ **tổng quan** → **phân tách theo encoder** → **ablation từng model** → **radar landscape** → **so sánh trực tiếp best-vs-best** → **best overall**.
 
 ---
 
@@ -130,10 +130,10 @@ Chạy tuần tự cho `combigcn`, `bm3`, `freedom`.
 
 2. **Grouped barplot** (`plot_barplot_per_model`):  
    X = sim_type, grouped bars = encoder. Dấu ★ đỏ trên bar tốt nhất mỗi sim_type.  
-   Dùng NDCG@10 làm tiêu chí chính.
+   Vẽ **2 barplot**: NDCG@5 (phân tích thực) và NDCG@10 (so sánh literature).
 
 3. **Ranking table** (`display_ranking_table`):  
-   DataFrame styled với highlight ô max, sort theo NDCG@10 giảm dần.
+   DataFrame styled với highlight ô max, sort theo NDCG@5 và NDCG@10 giảm dần.
 
 > **Q&A — Sau Ablation từng model**
 >
@@ -170,28 +170,80 @@ Mỗi subplot: bar chart dọc, X = best-config label của từng model, groupe
 > → Metric có biên độ lớn là metric "phân biệt" nhất — dùng làm tiêu chí chọn model. Metric nào các bar gần bằng nhau: không đủ sức phân biệt.
 >
 > **Q: Giữa K=1 và K=20, xu hướng thứ hạng model có thay đổi không?**  
-> → Nếu thay đổi: model tốt ở top-1 chưa chắc tốt ở top-20 (và ngược lại). Cần xác định use case: precision (K nhỏ) hay recall (K lớn). → Sang Tầng 1 Best-vs-Best để so sánh chi tiết qua K.
+> → Nếu thay đổi: model tốt ở top-1 chưa chắc tốt ở top-20 (và ngược lại). Cần xác định use case: precision (K nhỏ) hay recall (K lớn). → Sang Radar Overview để xem toàn cảnh trước Best-vs-Best.
+
+---
+
+## Radar Overview — Tổng quan tất cả configs
+
+```python
+plot_radar_overview(df)
+```
+
+Trước khi thu hẹp về 3 best configs, phần này cho thấy **toàn cảnh "hình dạng" performance** của mọi model config trên 6 metrics.
+
+**3 radar charts liên tiếp:**
+
+| Chart | Configs | Mô tả |
+|---|---|---|
+| **Radar — All 24 Configs** | 24 | Toàn bộ landscape: mỗi đường = 1 config, giá trị = mean qua K |
+| **Radar — CLIP (12 Configs)** | 12 | Chỉ các config dùng CLIP encoder |
+| **Radar — MBNv2 (12 Configs)** | 12 | Chỉ các config dùng MBNv2 encoder |
+
+Mỗi radar: trục = 6 metrics (RECALL, PRECISION, NDCG, HIT\_RATIO, MAP, MRR), giá trị trung bình qua K=1/5/10/20.  
+Diện tích lớn hơn = model config mạnh hơn tổng thể.
+
+**Vẽ riêng từng encoder hoặc subset:**
+```python
+plot_radar_overview(df, save_dir="charts/radar")
+# Vẽ 1 radar custom với bất kỳ subset:
+from plot_tier2 import _plot_single_radar
+from load_data import to_results_dict
+results = to_results_dict(df[df["model"] == "bm3"])
+_plot_single_radar(results, title="BM3 — All configs")
+```
+
+> **Q&A — Sau Radar Overview**
+>
+> **Q: Hình dạng radar của CLIP và MBNv2 có khác nhau nhiều không?**  
+> → Nếu MBNv2 có diện tích lớn hơn ở NDCG/Recall: encoder thực sự tạo ra sự khác biệt. Nếu 2 nhóm chồng lên nhau: sim_type mới là yếu tố quyết định.
+>
+> **Q: Config nào có diện tích radar lớn nhất và đều nhất?**  
+> → Config có diện tích lớn + đều (không quá lệch về 1 metric) là ứng viên mạnh nhất tổng thể. → Sang Best-vs-Best để so sánh chính thức 3 best configs.
 
 ---
 
 ## Tầng 1 — Best-vs-Best: Model nào tốt nhất?
 
 ```python
-best_df, best_results = plot_best_vs_best(df)
+# Chạy 2 lần: K=5 (phân tích thực) và K=10 (so sánh literature)
+best_df5, best_results5 = plot_best_vs_best(df, rank_metric="ndcg@5")
+display(display_summary_table(best_df5))
+
+best_df, best_results = plot_best_vs_best(df, rank_metric="ndcg@10")
 display(display_summary_table(best_df))
 ```
 
-Lấy config tốt nhất của mỗi model (theo NDCG@10) rồi so sánh trực tiếp.
+> **Tại sao chạy cả K=5 và K=10?**
+>
+> Dataset này có ~3.8 test items/user trung bình (2.105 interactions / 553 users).  
+> - **K=5** recommend 1.3× ground truth size → phân biệt model rõ hơn, ít bị inflate hơn.  
+> - **K=10** recommend 2.6× ground truth → recall dễ bão hòa, nhưng là convention trong tất cả paper gốc (BM3, FREEDOM, CombiGCN) nên cần giữ để so sánh.
 
-**Best configs được chọn:**
+Lấy config tốt nhất của mỗi model theo từng tiêu chí rồi so sánh trực tiếp.
 
-| Model | Best config | NDCG@10 |
-|---|---|---|
-| bm3 | `mbnv2(multimodal)` | 0.018595 |
-| combigcn | `mbnv2(multimodal)` | 0.017486 |
-| freedom | `mbnv2(multimodal_attention)` | 0.008759 |
+**Best configs (kết quả thực tế sau khi chạy notebook):**
 
-**3 loại chart:**
+| Tiêu chí | Model | Best config | Score |
+|---|---|---|---|
+| NDCG@5 | bm3 | _(chạy notebook để xem)_ | — |
+| NDCG@5 | combigcn | _(chạy notebook để xem)_ | — |
+| NDCG@5 | freedom | _(chạy notebook để xem)_ | — |
+| NDCG@10 | bm3 | `mbnv2(multimodal)` | 0.018595 |
+| NDCG@10 | combigcn | `mbnv2(multimodal)` | 0.017486 |
+| NDCG@10 | freedom | `mbnv2(multimodal_attention)` | 0.008759 |
+
+**3 loại chart** (chạy cho cả K=5 và K=10, radar best-vs-best luôn là chart cuối cùng):
 
 1. **Lineplot grid** (`plot_lineplot_grid`):  
    Grid **2×3**, 6 metrics. Mỗi subplot: X = K, Y = metric, mỗi đường = một model.  
@@ -200,13 +252,16 @@ Lấy config tốt nhất của mỗi model (theo NDCG@10) rồi so sánh trực
 2. **Single lineplot** (`plot_lineplot_single`):  
    Phóng to chart NDCG@K riêng lẻ — rõ hơn khi cần trình bày.
 
-3. **Radar chart** (`plot_radar_chart`):  
-   So sánh tổng thể trên 6 metrics (trung bình qua K). Diện tích radar = sức mạnh tổng hợp.
+3. **Radar chart — Best-vs-Best** (`plot_radar_chart`):  
+   So sánh 3 best configs trên 6 metrics (trung bình qua K). Đây là radar **cuối cùng**, sau 3 radar overview ở phần trên.
 
 **Summary table:**  
-Styled DataFrame với highlight ô max per column. Rank 1 = model tốt nhất.
+Styled DataFrame với highlight ô max per column. Hiển thị K=5, K=10, K=20. Rank 1 = model tốt nhất.
 
 > **Q&A — Sau Best-vs-Best**
+>
+> **Q: Kết quả K=5 và K=10 có chọn cùng "best config" cho mỗi model không?**  
+> → Nếu giống nhau: config tốt ổn định qua các K, tự tin lựa chọn. Nếu khác nhau: cần xem xét use case — ưu tiên phân biệt thực (K=5) hay so sánh với literature (K=10).
 >
 > **Q: Khoảng cách giữa BM3 (rank 1) và CombiGCN (rank 2) có đáng kể không?**  
 > → Nếu < 5% relative difference: 2 model gần tương đương, lựa chọn có thể dựa trên tốc độ inference hoặc tính ổn định training. Nếu > 10%: BM3 rõ ràng vượt trội.
@@ -215,7 +270,39 @@ Styled DataFrame với highlight ô max per column. Rank 1 = model tốt nhất.
 > → Nếu FREEDOM gần hơn trên Precision@1: nó có thể phù hợp hơn cho use case cần top-1 chính xác. Radar chart sẽ cho thấy "hình dạng" strength/weakness của mỗi model.
 >
 > **Q: Thứ hạng model có nhất quán qua K=1, 5, 10, 20 không?**  
-> → Nếu model A thắng K=1 nhưng model B thắng K=20: cần chọn K phù hợp với product (gợi ý 1 item vs top-20). → Kết quả này là câu trả lời cuối cùng cho câu hỏi "Model nào tốt nhất cho Chuyên đề 2?"
+> → Nếu model A thắng K=1 nhưng model B thắng K=20: cần chọn K phù hợp với product (gợi ý 1 item vs top-20). → Xem Best Overall bên dưới để kết luận tổng thể.
+
+---
+
+## Best Overall Model for Each Metric
+
+```python
+plot_best_overall_per_metric(df)
+```
+
+Chart kết luận của toàn bộ phân tích. Với **mỗi metric**, tìm model config có **mean score cao nhất** trung bình qua tất cả K=1/5/10/20.
+
+**Bar chart:**
+- Trục X = 6 metrics: RECALL, PRECISION, NDCG, HIT\_RATIO, MRR, MAP
+- Trục Y = Mean Score (trung bình qua K)
+- Mỗi bar = metric có màu riêng biệt
+- Annotation trên mỗi bar: tên model config + giá trị (4 chữ số thập phân)
+
+**Đọc chart:** Bar cao nhất cho biết metric nào dễ đạt được; config được annotate cho biết model nào thống trị metric đó sau khi trung bình hoá qua mọi K.
+
+**Vẽ với subset hoặc metrics tùy chọn:**
+```python
+plot_best_overall_per_metric(df, metrics=["recall", "ndcg", "mrr"])
+plot_best_overall_per_metric(df[df["encoder"] == "clip"])  # CLIP only
+```
+
+> **Q&A — Sau Best Overall**
+>
+> **Q: Có một model config duy nhất thắng trên tất cả 6 metrics không?**  
+> → Nếu có: đó là config tốt nhất tuyệt đối. Nếu khác nhau: mỗi metric ưu tiên config khác nhau — xem xét metric phù hợp với use case.
+>
+> **Q: Metric nào có mean score cao nhất và thấp nhất?**  
+> → Bar cao nhất = metric dễ đạt (model học được tốt). Bar thấp nhất = metric khó — Precision@K thường thấp nhất vì đòi hỏi chính xác ở từng vị trí. MRR cao nếu model đặt relevant item ở top-1 thường xuyên.
 
 ---
 
@@ -230,6 +317,12 @@ plot_heatmap_per_model(df, model="combigcn", metric="recall")
 # Single lineplot NDCG phóng to
 plot_lineplot_single(best_results, metric="ndcg")
 
+# Radar overview với custom save dir
+plot_radar_overview(df, save_dir="charts/radar")
+
+# Best overall cho subset encoder
+plot_best_overall_per_metric(df[df["encoder"] == "mbnv2"])
+
 # Save toàn bộ ra folder
 plot_ablation(df, save_dir="charts/tier2")
 plot_best_vs_best(df, save_dir="charts/tier1")
@@ -240,8 +333,8 @@ plot_best_vs_best(df, save_dir="charts/tier1")
 > **Q: Nếu thêm model mới (VD: SGL, SimGCL), cần làm gì?**  
 > → Thêm runs vào CSV, gọi lại `load_from_csv()`. Tất cả hàm plot sẽ tự động include model mới — không cần sửa code plot.
 >
-> **Q: Nếu muốn so sánh theo metric khác thay vì NDCG@10 làm rank?**  
-> → Truyền `rank_metric="recall@10"` vào `plot_best_vs_best(df, rank_metric="recall@10")`. Best config được chọn sẽ thay đổi theo metric này.
+> **Q: Nếu muốn so sánh theo metric khác thay vì NDCG làm rank?**  
+> → Truyền `rank_metric="recall@5"` vào `plot_best_vs_best(df, rank_metric="recall@5")`. Best config được chọn sẽ thay đổi theo metric này.
 >
 > **Q: Muốn export bảng kết quả ra LaTeX/CSV cho báo cáo?**  
 > → `summary_table(best_df).to_latex()` hoặc `.to_csv("results.csv")`. Hàm `summary_table` trả về DataFrame thuần, không phụ thuộc matplotlib.
@@ -252,10 +345,10 @@ plot_best_vs_best(df, save_dir="charts/tier1")
 
 ```
 data_evaluate/
-├── evaluate.ipynb          # Notebook chính (19 cells)
+├── evaluate.ipynb          # Notebook chính (27 cells)
 ├── load_data.py            # Load & transform data từ WandB CSV
-├── plot_tier2.py           # Ablation charts (heatmap, barplot, histogram, lineplot)
-├── plot_tier1.py           # Best-vs-best charts (lineplot grid, radar, histogram)
+├── plot_tier2.py           # Ablation + radar overview charts
+├── plot_tier1.py           # Best-vs-best + best-overall charts
 ├── EVALUATION_GUIDE.md     # Tài liệu này
 ├── data_wandb/
 │   └── all_runs_summary.csv
@@ -275,7 +368,13 @@ data_evaluate/
           ↓
 5. Tier 1 Preview                → Best config mỗi model trông như thế nào?
           ↓
-6. Tầng 1 Best-vs-Best           → Model nào chiến thắng?  ← Kết luận chính
+6. Radar Overview (24 / 12 / 12) → Toàn cảnh "hình dạng" performance trước khi thu hẹp
           ↓
-7. Custom charts                 → Drill-down bất kỳ thứ gì cần làm rõ thêm
+7. Tầng 1 Best-vs-Best @ K=5     → Model nào chiến thắng? (tiêu chí sát thực)
+          ↓
+8. Tầng 1 Best-vs-Best @ K=10    → Model nào chiến thắng? (so sánh với literature)
+          ↓
+9. Best Overall per Metric       → Kết luận tổng thể: model nào tốt nhất mỗi metric? ← Kết luận cuối
+          ↓
+10. Custom charts                → Drill-down bất kỳ thứ gì cần làm rõ thêm
 ```

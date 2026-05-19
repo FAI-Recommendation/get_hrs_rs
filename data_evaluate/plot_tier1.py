@@ -241,7 +241,7 @@ def summary_table(df_best: pd.DataFrame) -> pd.DataFrame:
     """
     display_cols = ["model", "encoder", "sim_type"]
     for m in _DISPLAY_METRICS:
-        for k in [10, 20]:
+        for k in [5, 10, 20]:
             display_cols.append(f"{m}@{k}")
 
     table = df_best[display_cols].copy()
@@ -401,3 +401,68 @@ def plot_best_vs_best(df: pd.DataFrame, rank_metric: str = "ndcg@10",
     print()
 
     return best, results
+
+
+# ─────────────────────────────────────────────
+# Best overall model per metric (bar chart)
+# ─────────────────────────────────────────────
+
+_BEST_OVERALL_METRICS = ["recall", "precision", "ndcg", "hit_ratio", "mrr", "map"]
+
+
+def plot_best_overall_per_metric(df: pd.DataFrame,
+                                 metrics: list = None,
+                                 figsize=(14, 7),
+                                 save_path: str = None):
+    """
+    Bar chart: for each metric, show the model config with the highest
+    mean score averaged across all K values.
+    X = metrics, Y = mean score. Each bar annotated with value + config name.
+    """
+    if metrics is None:
+        metrics = _BEST_OVERALL_METRICS
+
+    best_labels = []
+    best_scores = []
+
+    for metric in metrics:
+        k_cols = [f"{metric}@{k}" for k in K_VALUES]
+        df_tmp = df.copy()
+        df_tmp["_mean"] = df_tmp[k_cols].mean(axis=1)
+        best_row = df_tmp.loc[df_tmp["_mean"].idxmax()]
+        label = f"{best_row['model']}_{best_row['encoder']}({best_row['sim_type']})"
+        best_labels.append(label)
+        best_scores.append(float(best_row["_mean"]))
+
+    colors = plt.cm.tab10.colors
+    bar_colors = [colors[i % len(colors)] for i in range(len(metrics))]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    x_pos = range(len(metrics))
+    bars = ax.bar(
+        x_pos, best_scores,
+        color=bar_colors, edgecolor="black", linewidth=0.6,
+        width=0.55,
+    )
+
+    y_pad = max(best_scores) * 0.015
+    for bar, label, score in zip(bars, best_labels, best_scores):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + y_pad,
+            f"{label}\n{score:.4f}",
+            ha="center", va="bottom",
+            fontsize=8.5, fontweight="bold", color="black",
+        )
+
+    ax.set_xticks(list(x_pos))
+    ax.set_xticklabels([m.upper() for m in metrics], fontsize=11)
+    ax.set_ylabel("Mean Score", fontsize=12)
+    ax.set_xlabel("Metrics", fontsize=12)
+    ax.set_title("Best Overall Models for Each Metric", fontsize=14, fontweight="bold")
+    ax.yaxis.grid(True, linestyle="--", alpha=0.6)
+    ax.set_axisbelow(True)
+    # extra headroom for annotations
+    ax.set_ylim(0, max(best_scores) * 1.35)
+    plt.tight_layout()
+    _show_and_save(fig, "Best Overall Models for Each Metric", save_path)

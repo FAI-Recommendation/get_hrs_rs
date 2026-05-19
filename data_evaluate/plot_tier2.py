@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from load_data import METRICS, K_VALUES, _fig_counter
+from load_data import METRICS, K_VALUES, _fig_counter, to_results_dict
 
 sns.set_theme(style="whitegrid", palette="Set2", font_scale=1.1)
 
@@ -193,11 +193,14 @@ def plot_ablation(df: pd.DataFrame, models: list = None,
             sp = f"{save_dir}/{model}_heatmap_{metric}.png" if save_dir else None
             plot_heatmap_per_model(df, model, metric=metric, save_path=sp)
 
+        sp = f"{save_dir}/{model}_barplot_ndcg5.png" if save_dir else None
+        plot_barplot_per_model(df, model, metric="ndcg", k=5, save_path=sp)
+
         sp = f"{save_dir}/{model}_barplot_ndcg10.png" if save_dir else None
         plot_barplot_per_model(df, model, metric="ndcg", k=10, save_path=sp)
 
         table = ranking_table_per_model(df, model)
-        print(f"\nRanking table — {model.upper()} (by NDCG@10):")
+        print(f"\nRanking table — {model.upper()} (by NDCG@5 và NDCG@10):")
         print(table[["encoder", "sim_type"] +
                      [f"{m}@10" for m in METRICS]].to_string())
         print()
@@ -564,3 +567,72 @@ def plot_lineplot_3metrics_both(df: pd.DataFrame, metrics: list = None,
     for encoder in ["clip", "mbnv2"]:
         sp = f"{save_dir}/lineplot_3metrics_{encoder}.png" if save_dir else None
         plot_lineplot_3metrics(df, encoder=encoder, metrics=metrics, save_path=sp)
+
+
+# ─────────────────────────────────────────────
+# 8. Radar overview: full / clip / mbnv2
+# ─────────────────────────────────────────────
+
+_RADAR_METRICS = ["recall", "precision", "ndcg", "hit_ratio", "map", "mrr"]
+
+
+def _plot_single_radar(results_dict: dict, title: str,
+                       metrics: list = None,
+                       figsize=(10, 10), save_path: str = None):
+    """
+    Radar chart for an arbitrary results_dict (any number of model configs).
+    Each line = one config, values = mean across K for each metric.
+    """
+    if metrics is None:
+        metrics = _RADAR_METRICS
+
+    avg = {}
+    for label, data in results_dict.items():
+        avg[label] = {m: float(np.mean(data[m])) for m in metrics if m in data}
+
+    angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False)
+    angles_plot = np.concatenate((angles, [angles[0]]))
+
+    fig, ax = plt.subplots(figsize=figsize, subplot_kw=dict(projection="polar"))
+    colors = plt.cm.tab20.colors
+
+    for i, (label, m_vals) in enumerate(avg.items()):
+        values = [m_vals.get(m, 0) for m in metrics] + [m_vals.get(metrics[0], 0)]
+        ax.plot(angles_plot, values, "o-", linewidth=1.5,
+                label=label, color=colors[i % len(colors)], alpha=0.8)
+        ax.fill(angles_plot, values, alpha=0.05, color=colors[i % len(colors)])
+
+    ax.set_xticks(angles)
+    ax.set_xticklabels([m.upper() for m in metrics], fontsize=11)
+    n = len(results_dict)
+    ax.legend(
+        loc="upper right",
+        bbox_to_anchor=(1.35, 1.15),
+        fontsize=8 if n > 12 else 9,
+        ncol=2 if n > 12 else 1,
+    )
+    ax.set_title(title, fontsize=13, fontweight="bold", pad=20)
+    plt.tight_layout()
+    _show_and_save(fig, title, save_path)
+
+
+def plot_radar_overview(df: pd.DataFrame, metrics: list = None,
+                        save_dir: str = None):
+    """
+    3 radar charts showing all model configs grouped by encoder scope:
+      1. Full  — all 24 configs
+      2. CLIP  — 12 configs
+      3. MBNv2 — 12 configs
+
+    Call this before plot_best_vs_best() so the best-vs-best radar stays last.
+    """
+    configs = [
+        (None,    "Radar Overview — All 24 Configs",    "radar_overview_full"),
+        ("clip",  "Radar Overview — CLIP (12 Configs)", "radar_overview_clip"),
+        ("mbnv2", "Radar Overview — MBNv2 (12 Configs)","radar_overview_mbnv2"),
+    ]
+    for enc, title, fname in configs:
+        sub = df if enc is None else df[df["encoder"] == enc]
+        results = to_results_dict(sub)
+        sp = f"{save_dir}/{fname}.png" if save_dir else None
+        _plot_single_radar(results, title, metrics=metrics, save_path=sp)

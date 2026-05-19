@@ -7,6 +7,21 @@
 
 ---
 
+## Phạm vi thực nghiệm
+
+Bộ thực nghiệm chính gồm **24 runs**: 3 models × 2 embeddings × 4 sim_type.
+
+Trong đó, với nhóm multimodal, chỉ **2 fusion method** được đưa vào thực nghiệm chính:
+
+| sim_type | Fusion method | Lý do chọn |
+|---|---|---|
+| `multimodal` | **Late Fusion** | Baseline ổn định, không cần tham số học thêm |
+| `multimodal_attention` | **Weight Attention Fusion** | Học trọng số tự động, kết quả tốt nhất |
+
+Hai method còn lại (`aggregation`, `pca`) đã thử sơ bộ nhưng không vượt trội → không đưa vào 24 thực nghiệm chính.
+
+---
+
 ## Kết quả so sánh các chiến lược fusion
 
 ### Nhận xét chính
@@ -37,6 +52,24 @@
 ## Khuyến nghị
 
 Với dataset VCR 10k:
-- Dùng **Late Fusion** làm baseline (đơn giản, ổn định)
-- Dùng **Weight Attention** để đạt kết quả tốt nhất (phức tạp hơn một chút)
+- Dùng **Late Fusion** (`sim_type=multimodal`) làm baseline (đơn giản, ổn định)
+- Dùng **Weight Attention** (`sim_type=multimodal_attention`) để đạt kết quả tốt nhất (phức tạp hơn một chút)
 - Tránh dùng Early Fusion vì kết quả kém hơn đáng kể ở k=1
+
+---
+
+## Mapping sim_type → Fusion method → Config
+
+```bash
+# Late Fusion (default)
+python train.py --sim_type multimodal ...
+# tương đương: MULTIMODAL_METHOD=late_fusion trong .env
+
+# Weight Attention Fusion
+python train.py --sim_type multimodal_attention ...
+# tương đương: MULTIMODAL_METHOD=attention trong .env
+```
+
+Tham khảo chi tiết kiến trúc và cách chạy thực nghiệm tại:
+- [`models_pyg_training_latest/00_README.md`](models_pyg_training_latest/00_README.md) — tổng quan 24 thực nghiệm
+- [`models_pyg_training_latest/06_scripts_experiments.md`](models_pyg_training_latest/06_scripts_experiments.md) — bảng tracking
