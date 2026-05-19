@@ -166,10 +166,12 @@ def main():
     # ── Load raw embeddings (BM3 / FREEDOM) ──
     image_feats = text_feats = None
     if model_name in ("bm3", "freedom"):
-        print(f"\n📦 Loading raw embeddings for {model_name.upper()} ...")
-        image_feats, text_feats = data.get_raw_embeddings()
-        image_feats = image_feats.to(device)
-        text_feats = text_feats.to(device)
+        use_image = args.sim_type in ("img_only", "multimodal", "multimodal_attention")
+        use_text  = args.sim_type in ("tfidf",    "multimodal", "multimodal_attention")
+        print(f"\n📦 Loading raw embeddings for {model_name.upper()} (sim_type={args.sim_type}) ...")
+        img_all, txt_all = data.get_raw_embeddings()
+        image_feats = img_all.to(device) if use_image else None
+        text_feats  = txt_all.to(device) if use_text  else None
 
     # ── Create model ──
     node_dropout = eval(args.node_dropout)[0] if args.node_dropout_flag else 0.0
@@ -195,6 +197,7 @@ def main():
             dropout=node_dropout,
             momentum=args.bm3_momentum,
             cl_weight=args.bm3_cl_weight,
+            sim_type=args.sim_type,
         ).to(device)
     elif model_name == "freedom":
         model = FREEDOM(
@@ -209,6 +212,7 @@ def main():
             knn_k=args.freedom_knn_k,
             cl_weight=args.freedom_cl_weight,
             cl_temp=args.freedom_cl_temp,
+            sim_type=args.sim_type,
         ).to(device)
     else:
         raise ValueError(f"Unknown model: {model_name}")
@@ -229,7 +233,7 @@ def main():
     if model_name == "combigcn":
         model_tag = f"combigcn_{args.sim_type}"
     else:
-        model_tag = f"{model_name}_{args.embed_type}"
+        model_tag = f"{model_name}_{args.sim_type}_{args.embed_type}"
     run_name = args.wandb_run_name or (
         f"{model_tag}_layers{n_layers}_dim{args.embed_size}_lr{args.lr}_reg{decay}"
     )

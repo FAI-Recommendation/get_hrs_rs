@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# TEST: BM3 với mbnv2 — 20 epochs để verify pipeline
+# TEST: BM3 + tfidf (mbnv2) — 20 epochs để verify pipeline
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -17,6 +17,7 @@ fi
 python3 train.py \
     --model bm3 \
     --embed_type mbnv2 \
+    --sim_type tfidf \
     --data_path ../get10k_data/mbnv2_10k_sample \
     --dataset "" \
     --embed_size 64 \

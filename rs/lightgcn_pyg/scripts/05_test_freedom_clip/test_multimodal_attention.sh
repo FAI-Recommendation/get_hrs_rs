@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# TEST: FREEDOM với mbnv2 — 20 epochs để verify pipeline
+# TEST: FREEDOM + multimodal_attention (clip) — 20 epochs để verify pipeline
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -16,8 +16,9 @@ fi
 
 python3 train.py \
     --model freedom \
-    --embed_type mbnv2 \
-    --data_path ../get10k_data/mbnv2_10k_sample \
+    --embed_type clip \
+    --sim_type multimodal_attention \
+    --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
     --embed_size 64 \
     --layer_size "[64,64,64]" \

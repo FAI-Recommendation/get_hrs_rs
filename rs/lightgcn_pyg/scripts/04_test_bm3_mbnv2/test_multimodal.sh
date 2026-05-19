@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# TEST: BM3 với CLIP — 20 epochs để verify pipeline
+# TEST: BM3 + multimodal (mbnv2) — 20 epochs để verify pipeline
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -16,8 +16,9 @@ fi
 
 python3 train.py \
     --model bm3 \
-    --embed_type clip \
-    --data_path ../get10k_data/clip_10k_sample \
+    --embed_type mbnv2 \
+    --sim_type multimodal \
+    --data_path ../get10k_data/mbnv2_10k_sample \
     --dataset "" \
     --embed_size 64 \
     --layer_size "[64,64,64]" \

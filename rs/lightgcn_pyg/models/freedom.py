@@ -4,18 +4,11 @@ models/freedom.py — FREEDOM: Freezing and Denoising for Multimodal Recommendat
 Paper: "Freedom: Freezing and Denoising Graph Structures for Multimodal Recommendation"
        Zhou et al., ACM MM 2023
 
-Ý tưởng chính:
-  - Xây dựng item-item graph từ modal features (cosine sim → top-k kNN)
-  - "Freeze": item-item graph không được update qua backprop (fixed structure)
-  - "Denoise": interaction graph được denoised bằng degree-aware normalization
-  - 2 luồng GCN: interaction graph (CF) + item-item graph (content)
-  - Fuse CF embedding + content embedding cho items
-  - BPR loss + contrastive loss giữa CF view và content view
-
-Input cần có:
-  - interaction_adj: normalized bipartite graph (SparseTensor)
-  - image_feats:     [n_items, img_dim]
-  - text_feats:      [n_items, txt_dim]
+sim_type variants:
+  img_only             → kNN graph + content từ image only
+  tfidf                → kNN graph + content từ text only
+  multimodal           → fuse image + text (late fusion)
+  multimodal_attention → fuse image + text (attention fusion)
 """
 
 import torch
@@ -25,36 +18,53 @@ from torch import Tensor
 from torch_sparse import SparseTensor, matmul
 
 
+class _AttentionFusion(nn.Module):
+    """Weighted attention fusion: concat → Linear → d."""
+    def __init__(self, dim: int):
+        super().__init__()
+        self.fc = nn.Linear(dim * 2, dim)
+
+    def forward(self, img: Tensor, txt: Tensor) -> Tensor:
+        return self.fc(torch.cat([img, txt], dim=1))
+
+
 def build_knn_item_graph(
-    image_feats: Tensor,
-    text_feats: Tensor,
+    image_feats: "Tensor | None",
+    text_feats: "Tensor | None",
+    sim_type: str,
     k: int = 10,
     device: torch.device = None,
 ) -> SparseTensor:
     """
-    Xây dựng item-item kNN graph từ modal features.
-    Cosine sim → top-k neighbors → symmetric → row-normalize.
+    Xây dựng item-item kNN graph từ modal features theo sim_type.
+    cosine sim → top-k neighbors → symmetric → row-normalize.
     """
+    assert sim_type in ("img_only", "tfidf", "multimodal", "multimodal_attention")
+
     if device is None:
-        device = image_feats.device
+        device = (image_feats if image_feats is not None else text_feats).device
 
-    n = image_feats.shape[0]
+    # ── Chọn features để build graph ──
+    if sim_type == "img_only":
+        feats = F.normalize(image_feats.float().to(device), dim=1)
+    elif sim_type == "tfidf":
+        feats = F.normalize(text_feats.float().to(device), dim=1)
+    else:
+        # multimodal / multimodal_attention: avg của 2 normalized features
+        img = F.normalize(image_feats.float().to(device), dim=1)
+        txt = F.normalize(text_feats.float().to(device), dim=1)
+        feats = (img + txt) / 2.0
 
-    # Fuse image + text features
-    img = F.normalize(image_feats.float().to(device), dim=1)
-    txt = F.normalize(text_feats.float().to(device), dim=1)
-    feats = (img + txt) / 2.0  # [n, d_avg] — late fusion trước khi build graph
-
-    # Tính cosine sim theo batch để tránh OOM
+    n = feats.shape[0]
     batch = 256
     rows, cols, vals = [], [], []
+
     for i in range(0, n, batch):
-        chunk = feats[i : i + batch]                   # [b, d]
-        sim = torch.mm(chunk, feats.t())               # [b, n]
-        sim[:, i : i + chunk.shape[0]].fill_diagonal_(-1.0)  # mask self-loop
+        chunk = feats[i : i + batch]
+        sim = torch.mm(chunk, feats.t())
+        sim[:, i : i + chunk.shape[0]].fill_diagonal_(-1.0)
 
-        topk_vals, topk_idx = sim.topk(k, dim=1)      # [b, k]
-
+        topk_vals, topk_idx = sim.topk(k, dim=1)
         src = torch.arange(i, i + chunk.shape[0], device=device).unsqueeze(1).expand_as(topk_idx)
         rows.append(src.reshape(-1))
         cols.append(topk_idx.reshape(-1))
@@ -64,18 +74,17 @@ def build_knn_item_graph(
     cols = torch.cat(cols)
     vals = torch.cat(vals)
 
-    # Symmetrize: thêm cả chiều ngược lại
+    # Symmetrize
     rows_sym = torch.cat([rows, cols])
     cols_sym = torch.cat([cols, rows])
     vals_sym = torch.cat([vals, vals])
 
-    # Row-normalize
     adj = SparseTensor(
         row=rows_sym, col=cols_sym, value=vals_sym,
         sparse_sizes=(n, n),
     ).coalesce("sum")
 
-    deg = adj.sum(dim=1).clamp(min=1.0)               # [n]
+    deg = adj.sum(dim=1).clamp(min=1.0)
     adj_val = adj.storage.value() / deg[adj.storage.row()]
 
     return SparseTensor(
@@ -91,15 +100,16 @@ class FREEDOM(nn.Module):
         self,
         n_users: int,
         n_items: int,
-        image_feats: Tensor,          # [n_items, img_dim]
-        text_feats: Tensor,           # [n_items, txt_dim]
+        image_feats: "Tensor | None",     # None nếu sim_type=tfidf
+        text_feats: "Tensor | None",      # None nếu sim_type=img_only
         embedding_dim: int = 64,
         n_layers: int = 2,
         decay: float = 1e-4,
         dropout: float = 0.0,
-        knn_k: int = 10,              # số neighbors cho item-item graph
-        cl_weight: float = 0.1,       # weight của contrastive loss
-        cl_temp: float = 0.2,         # temperature cho InfoNCE
+        knn_k: int = 10,
+        cl_weight: float = 0.1,
+        cl_temp: float = 0.2,
+        sim_type: str = "multimodal",     # img_only | tfidf | multimodal | multimodal_attention
     ):
         super().__init__()
         self.n_users = n_users
@@ -110,6 +120,11 @@ class FREEDOM(nn.Module):
         self.dropout = dropout
         self.cl_weight = cl_weight
         self.cl_temp = cl_temp
+        self.sim_type = sim_type
+
+        assert sim_type in ("img_only", "tfidf", "multimodal", "multimodal_attention")
+        use_image = sim_type in ("img_only", "multimodal", "multimodal_attention")
+        use_text  = sim_type in ("tfidf",    "multimodal", "multimodal_attention")
 
         # ── ID embeddings ──
         self.user_embedding = nn.Embedding(n_users, embedding_dim)
@@ -118,19 +133,27 @@ class FREEDOM(nn.Module):
         nn.init.xavier_normal_(self.item_embedding.weight)
 
         # ── Modal projectors ──
-        img_dim = image_feats.shape[1]
-        txt_dim = text_feats.shape[1]
-        self.image_projector = nn.Linear(img_dim, embedding_dim)
-        self.text_projector = nn.Linear(txt_dim, embedding_dim)
+        self.image_projector = None
+        self.text_projector  = None
 
-        self.register_buffer("image_feats", image_feats.float())
-        self.register_buffer("text_feats", text_feats.float())
+        if use_image:
+            assert image_feats is not None
+            self.image_projector = nn.Linear(image_feats.shape[1], embedding_dim)
+            self.register_buffer("image_feats", image_feats.float())
 
-        # ── Frozen item-item graph — built once, không update ──
-        device = image_feats.device
-        item_graph = build_knn_item_graph(image_feats, text_feats, k=knn_k, device=device)
-        # Register as buffer để tự động move sang đúng device
-        # SparseTensor không thể register_buffer trực tiếp → lưu COO tensors
+        if use_text:
+            assert text_feats is not None
+            self.text_projector = nn.Linear(text_feats.shape[1], embedding_dim)
+            self.register_buffer("text_feats", text_feats.float())
+
+        # ── Attention fusion ──
+        self.attention_fusion = None
+        if sim_type == "multimodal_attention":
+            self.attention_fusion = _AttentionFusion(embedding_dim)
+
+        # ── Frozen item-item graph ──
+        device = (image_feats if image_feats is not None else text_feats).device
+        item_graph = build_knn_item_graph(image_feats, text_feats, sim_type=sim_type, k=knn_k, device=device)
         row, col, val = item_graph.coo()
         self.register_buffer("_ig_row", row)
         self.register_buffer("_ig_col", col)
@@ -144,7 +167,25 @@ class FREEDOM(nn.Module):
         )
 
     # ─────────────────────────────────────────
-    # CF propagation trên interaction graph
+    # Modal fusion — chọn theo sim_type
+    # ─────────────────────────────────────────
+    def _modal_emb(self) -> Tensor:
+        if self.sim_type == "img_only":
+            return self.image_projector(self.image_feats)
+
+        if self.sim_type == "tfidf":
+            return self.text_projector(self.text_feats)
+
+        img = self.image_projector(self.image_feats)
+        txt = self.text_projector(self.text_feats)
+
+        if self.sim_type == "multimodal_attention":
+            return self.attention_fusion(img, txt)
+
+        return (img + txt) / 2.0   # multimodal late fusion
+
+    # ─────────────────────────────────────────
+    # CF propagation
     # ─────────────────────────────────────────
     def _cf_propagate(self, interaction_adj: SparseTensor) -> tuple[Tensor, Tensor]:
         user_emb = self.user_embedding.weight
@@ -165,15 +206,12 @@ class FREEDOM(nn.Module):
     # ─────────────────────────────────────────
     def _content_propagate(self) -> Tensor:
         item_graph = self._get_item_graph()
-        img_emb = self.image_projector(self.image_feats)   # [n_items, d]
-        txt_emb = self.text_projector(self.text_feats)     # [n_items, d]
-        item_emb = (img_emb + txt_emb) / 2.0
-
+        item_emb = self._modal_emb()
         all_embs = [item_emb]
         for _ in range(self.n_layers):
             item_emb = matmul(item_graph, item_emb)
             all_embs.append(item_emb)
-        return torch.stack(all_embs, dim=1).mean(dim=1)    # [n_items, d]
+        return torch.stack(all_embs, dim=1).mean(dim=1)
 
     # ─────────────────────────────────────────
     # InfoNCE contrastive loss
@@ -181,7 +219,7 @@ class FREEDOM(nn.Module):
     def _infonce(self, z1: Tensor, z2: Tensor) -> Tensor:
         z1 = F.normalize(z1, dim=1)
         z2 = F.normalize(z2, dim=1)
-        logits = torch.mm(z1, z2.t()) / self.cl_temp      # [b, b]
+        logits = torch.mm(z1, z2.t()) / self.cl_temp
         labels = torch.arange(z1.shape[0], device=z1.device)
         return F.cross_entropy(logits, labels)
 
@@ -197,17 +235,12 @@ class FREEDOM(nn.Module):
     ) -> tuple[Tensor, Tensor, Tensor]:
         user_emb_cf, item_emb_cf = self._cf_propagate(interaction_adj)
         item_emb_content = self._content_propagate()
-
-        # Fuse: CF + content
         item_emb = item_emb_cf + item_emb_content
 
         # BPR loss
         u_emb = user_emb_cf[users]
-        pos_emb = item_emb[pos_items]
-        neg_emb = item_emb[neg_items]
-
-        pos_scores = (u_emb * pos_emb).sum(dim=1)
-        neg_scores = (u_emb * neg_emb).sum(dim=1)
+        pos_scores = (u_emb * item_emb[pos_items]).sum(dim=1)
+        neg_scores = (u_emb * item_emb[neg_items]).sum(dim=1)
         bpr_loss = F.softplus(-(pos_scores - neg_scores)).mean()
 
         # Regularization
@@ -217,11 +250,8 @@ class FREEDOM(nn.Module):
             + self.item_embedding.weight[neg_items].norm(2).pow(2)
         ) / users.shape[0]
 
-        # Contrastive: CF view ↔ content view (item-level)
-        cl_loss = self._infonce(
-            item_emb_cf[pos_items],
-            item_emb_content[pos_items],
-        )
+        # InfoNCE: CF view ↔ content view
+        cl_loss = self._infonce(item_emb_cf[pos_items], item_emb_content[pos_items])
 
         loss = bpr_loss + reg_loss + self.cl_weight * cl_loss
         return loss, bpr_loss, reg_loss
@@ -233,12 +263,11 @@ class FREEDOM(nn.Module):
     def predict(
         self,
         interaction_adj: SparseTensor,
-        similarity_adj,   # unused — kept for uniform interface with CombiGCN
+        similarity_adj,   # unused — uniform interface với CombiGCN
         users: Tensor,
     ) -> Tensor:
         user_emb_cf, item_emb_cf = self._cf_propagate(interaction_adj)
-        item_emb_content = self._content_propagate()
-        item_emb = item_emb_cf + item_emb_content
+        item_emb = item_emb_cf + self._content_propagate()
         return user_emb_cf[users] @ item_emb.t()
 
     @staticmethod
@@ -252,5 +281,5 @@ class FREEDOM(nn.Module):
         return (
             f"FREEDOM(n_users={self.n_users}, n_items={self.n_items}, "
             f"dim={self.embedding_dim}, layers={self.n_layers}, "
-            f"knn_k built-in, cl_weight={self.cl_weight})"
+            f"sim_type={self.sim_type}, cl_weight={self.cl_weight})"
         )

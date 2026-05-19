@@ -4,17 +4,11 @@ models/bm3.py — BM3: Bootstrap Multimodal Contrastive Learning for Recommendat
 Paper: "Bootstrap Latent Representations for Multi-modal Recommendation"
        Zhou et al., WWW 2023
 
-Ý tưởng chính:
-  - ID embeddings + modal embeddings (image / text) → project về cùng dim
-  - LightGCN propagation trên interaction graph
-  - Bootstrap contrastive loss (self-supervised): CF view ↔ modal view
-    dùng momentum encoder (EMA update) thay vì negative pairs
-  - BPR loss cho ranking
-
-Input cần có:
-  - interaction_adj: normalized bipartite graph (SparseTensor)
-  - image_feats:     raw image embeddings  [n_items, img_dim]
-  - text_feats:      raw text embeddings   [n_items, txt_dim]
+sim_type variants:
+  img_only             → chỉ dùng image features
+  tfidf                → chỉ dùng text features
+  multimodal           → image + text, late fusion (avg)
+  multimodal_attention → image + text, weighted attention fusion
 """
 
 import copy
@@ -26,19 +20,30 @@ from torch import Tensor
 from torch_sparse import SparseTensor, matmul
 
 
+class _AttentionFusion(nn.Module):
+    """Weighted attention fusion: concat → Linear → d."""
+    def __init__(self, dim: int):
+        super().__init__()
+        self.fc = nn.Linear(dim * 2, dim)
+
+    def forward(self, img: Tensor, txt: Tensor) -> Tensor:
+        return self.fc(torch.cat([img, txt], dim=1))
+
+
 class BM3(nn.Module):
     def __init__(
         self,
         n_users: int,
         n_items: int,
-        image_feats: Tensor,          # [n_items, img_dim]
-        text_feats: Tensor,           # [n_items, txt_dim]
+        image_feats: "Tensor | None",     # [n_items, img_dim]  — None nếu sim_type=tfidf
+        text_feats: "Tensor | None",      # [n_items, txt_dim]  — None nếu sim_type=img_only
         embedding_dim: int = 64,
         n_layers: int = 2,
         decay: float = 1e-4,
         dropout: float = 0.0,
-        momentum: float = 0.995,      # EMA momentum cho target encoder
-        cl_weight: float = 0.2,       # weight của contrastive loss
+        momentum: float = 0.995,
+        cl_weight: float = 0.2,
+        sim_type: str = "multimodal",     # img_only | tfidf | multimodal | multimodal_attention
     ):
         super().__init__()
         self.n_users = n_users
@@ -49,6 +54,12 @@ class BM3(nn.Module):
         self.dropout = dropout
         self.momentum = momentum
         self.cl_weight = cl_weight
+        self.sim_type = sim_type
+
+        assert sim_type in ("img_only", "tfidf", "multimodal", "multimodal_attention"), \
+            f"Unknown sim_type for BM3: {sim_type}"
+        use_image = sim_type in ("img_only", "multimodal", "multimodal_attention")
+        use_text  = sim_type in ("tfidf",    "multimodal", "multimodal_attention")
 
         # ── ID embeddings ──
         self.user_embedding = nn.Embedding(n_users, embedding_dim)
@@ -56,22 +67,33 @@ class BM3(nn.Module):
         nn.init.xavier_normal_(self.user_embedding.weight)
         nn.init.xavier_normal_(self.item_embedding.weight)
 
-        # ── Modal feature projectors (online) ──
-        img_dim = image_feats.shape[1]
-        txt_dim = text_feats.shape[1]
-        self.image_projector = nn.Linear(img_dim, embedding_dim)
-        self.text_projector = nn.Linear(txt_dim, embedding_dim)
+        # ── Modal projectors (chỉ tạo cái cần thiết) ──
+        self.image_projector = None
+        self.text_projector  = None
 
-        # ── Register modal features as buffers ──
-        self.register_buffer("image_feats", F.normalize(image_feats.float(), dim=1))
-        self.register_buffer("text_feats", F.normalize(text_feats.float(), dim=1))
+        if use_image:
+            assert image_feats is not None
+            img_dim = image_feats.shape[1]
+            self.image_projector = nn.Linear(img_dim, embedding_dim)
+            self.register_buffer("image_feats", F.normalize(image_feats.float(), dim=1))
 
-        # ── Target (momentum) encoder — EMA copy của item_embedding ──
+        if use_text:
+            assert text_feats is not None
+            txt_dim = text_feats.shape[1]
+            self.text_projector = nn.Linear(txt_dim, embedding_dim)
+            self.register_buffer("text_feats", F.normalize(text_feats.float(), dim=1))
+
+        # ── Attention fusion (chỉ cho multimodal_attention) ──
+        self.attention_fusion = None
+        if sim_type == "multimodal_attention":
+            self.attention_fusion = _AttentionFusion(embedding_dim)
+
+        # ── Target (momentum) encoder ──
         self.item_embedding_target = copy.deepcopy(self.item_embedding)
         for p in self.item_embedding_target.parameters():
             p.requires_grad = False
 
-        # ── Predictor head (online → target alignment) ──
+        # ── Predictor head ──
         self.predictor = nn.Sequential(
             nn.Linear(embedding_dim, embedding_dim),
             nn.ReLU(),
@@ -79,7 +101,25 @@ class BM3(nn.Module):
         )
 
     # ─────────────────────────────────────────
-    # LightGCN propagation (dùng chung cho online + target)
+    # Modal fusion — chọn theo sim_type
+    # ─────────────────────────────────────────
+    def _modal_emb(self) -> Tensor:
+        if self.sim_type == "img_only":
+            return self.image_projector(self.image_feats)
+
+        if self.sim_type == "tfidf":
+            return self.text_projector(self.text_feats)
+
+        img = self.image_projector(self.image_feats)
+        txt = self.text_projector(self.text_feats)
+
+        if self.sim_type == "multimodal_attention":
+            return self.attention_fusion(img, txt)
+
+        return (img + txt) / 2.0   # multimodal late fusion
+
+    # ─────────────────────────────────────────
+    # LightGCN propagation
     # ─────────────────────────────────────────
     def _propagate(
         self,
@@ -99,7 +139,7 @@ class BM3(nn.Module):
         return final[: self.n_users], final[self.n_users :]
 
     # ─────────────────────────────────────────
-    # EMA update của target encoder
+    # EMA update target encoder
     # ─────────────────────────────────────────
     @torch.no_grad()
     def _update_target(self):
@@ -110,7 +150,7 @@ class BM3(nn.Module):
             target.data = self.momentum * target.data + (1.0 - self.momentum) * online.data
 
     # ─────────────────────────────────────────
-    # Bootstrap contrastive loss (no negative pairs)
+    # Bootstrap contrastive loss
     # ─────────────────────────────────────────
     def _bootstrap_loss(self, online: Tensor, target: Tensor) -> Tensor:
         online = F.normalize(self.predictor(online), dim=1)
@@ -127,27 +167,18 @@ class BM3(nn.Module):
         pos_items: Tensor,
         neg_items: Tensor,
     ) -> tuple[Tensor, Tensor, Tensor]:
-        # Online view: CF + modal
         user_emb_cf, item_emb_cf = self._propagate(
             interaction_adj,
             self.user_embedding.weight,
             self.item_embedding.weight,
         )
-
-        img_emb = self.image_projector(self.image_feats)   # [n_items, d]
-        txt_emb = self.text_projector(self.text_feats)     # [n_items, d]
-        item_emb_modal = (img_emb + txt_emb) / 2.0        # late fusion
-
-        # Fuse CF + modal for items
+        item_emb_modal = self._modal_emb()
         item_emb = item_emb_cf + item_emb_modal
 
         # BPR loss
         u_emb = user_emb_cf[users]
-        pos_emb = item_emb[pos_items]
-        neg_emb = item_emb[neg_items]
-
-        pos_scores = (u_emb * pos_emb).sum(dim=1)
-        neg_scores = (u_emb * neg_emb).sum(dim=1)
+        pos_scores = (u_emb * item_emb[pos_items]).sum(dim=1)
+        neg_scores = (u_emb * item_emb[neg_items]).sum(dim=1)
         bpr_loss = F.softplus(-(pos_scores - neg_scores)).mean()
 
         # Regularization
@@ -157,8 +188,7 @@ class BM3(nn.Module):
             + self.item_embedding.weight[neg_items].norm(2).pow(2)
         ) / users.shape[0]
 
-        # Bootstrap contrastive loss (CF ↔ modal, item-level)
-        # Target: momentum item embeddings
+        # Bootstrap contrastive loss
         _, item_emb_target = self._propagate(
             interaction_adj,
             self.user_embedding.weight,
@@ -169,7 +199,6 @@ class BM3(nn.Module):
             + self._bootstrap_loss(item_emb_modal[pos_items], item_emb_target[pos_items])
         ) / 2.0
 
-        # EMA update
         self._update_target()
 
         loss = bpr_loss + reg_loss + self.cl_weight * cl_loss
@@ -182,7 +211,7 @@ class BM3(nn.Module):
     def predict(
         self,
         interaction_adj: SparseTensor,
-        similarity_adj,   # unused — kept for uniform interface with CombiGCN
+        similarity_adj,   # unused — uniform interface với CombiGCN
         users: Tensor,
     ) -> Tensor:
         user_emb_cf, item_emb_cf = self._propagate(
@@ -190,12 +219,8 @@ class BM3(nn.Module):
             self.user_embedding.weight,
             self.item_embedding.weight,
         )
-        img_emb = self.image_projector(self.image_feats)
-        txt_emb = self.text_projector(self.text_feats)
-        item_emb = item_emb_cf + (img_emb + txt_emb) / 2.0
-
-        u_emb = user_emb_cf[users]
-        return u_emb @ item_emb.t()
+        item_emb = item_emb_cf + self._modal_emb()
+        return user_emb_cf[users] @ item_emb.t()
 
     @staticmethod
     def _dropout_sparse(adj: SparseTensor, dropout: float) -> SparseTensor:
@@ -208,5 +233,5 @@ class BM3(nn.Module):
         return (
             f"BM3(n_users={self.n_users}, n_items={self.n_items}, "
             f"dim={self.embedding_dim}, layers={self.n_layers}, "
-            f"momentum={self.momentum}, cl_weight={self.cl_weight})"
+            f"sim_type={self.sim_type}, momentum={self.momentum}, cl_weight={self.cl_weight})"
         )

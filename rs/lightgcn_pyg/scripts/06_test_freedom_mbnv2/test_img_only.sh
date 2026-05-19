@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# TEST: FREEDOM với CLIP — 20 epochs để verify pipeline
+# TEST: FREEDOM + img_only (mbnv2) — 20 epochs để verify pipeline
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -16,8 +16,9 @@ fi
 
 python3 train.py \
     --model freedom \
-    --embed_type clip \
-    --data_path ../get10k_data/clip_10k_sample \
+    --embed_type mbnv2 \
+    --sim_type img_only \
+    --data_path ../get10k_data/mbnv2_10k_sample \
     --dataset "" \
     --embed_size 64 \
     --layer_size "[64,64,64]" \

@@ -1,7 +1,7 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# FULL RUN: FREEDOM (Freezing and Denoising for Multimodal Recommendation)
-# Data: CLIP embeddings (clip_10k_sample)
+# FULL RUN: FREEDOM + tfidf
+# Data: clip embeddings
 # Paper: FREEDOM: Freezing and Denoising Graph Structures for Multimodal Recommendation, ACM MM 2023
 # ─────────────────────────────────────────────
 
@@ -23,9 +23,10 @@ done
 python3 train.py \
     --model freedom \
     --embed_type clip \
+    --sim_type tfidf \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
-    --wandb_run_name freedom_clip_layers4_dim512_lr0.001_reg1e-04 \
+    --wandb_run_name freedom_tfidf_layers4_dim512_lr0.001_reg1e-04_clip \
     --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
