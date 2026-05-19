@@ -1,0 +1,188 @@
+{
+  "main": {
+    "id": "07b7918d17956f5d",
+    "type": "split",
+    "children": [
+      {
+        "id": "17d7bdf5a41a1bd1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1a9b8bab48816e95",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "report/BAO_CAO_TIEN_DO_EVALUATION.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "BAO_CAO_TIEN_DO_EVALUATION"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9e88ba74323070f3",
+    "type": "split",
+    "children": [
+      {
+        "id": "10f6472c3d823813",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d865c10f2671ac96",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "10a22f7321627ccc",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "bd5551ad3493ae48",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "ca481b38cd599fc1",
+    "type": "split",
+    "children": [
+      {
+        "id": "2037b110800c37dc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "f340b4b837ff7c78",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "report/BAO_CAO_TIEN_DO_EVALUATION.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for BAO_CAO_TIEN_DO_EVALUATION"
+            }
+          },
+          {
+            "id": "c8f23f0d229bcd37",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "report/BAO_CAO_TIEN_DO_EVALUATION.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from BAO_CAO_TIEN_DO_EVALUATION"
+            }
+          },
+          {
+            "id": "45ed4758dbf556a9",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "996f2e20d8a34acb",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "0e6af4879e3e3616",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "report/BAO_CAO_TIEN_DO_EVALUATION.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of BAO_CAO_TIEN_DO_EVALUATION"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "1a9b8bab48816e95",
+  "lastOpenFiles": []
+}
