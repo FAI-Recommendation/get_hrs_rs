@@ -50,10 +50,11 @@ def build_knn_item_graph(
     elif sim_type == "tfidf":
         feats = F.normalize(text_feats.float().to(device), dim=1)
     else:
-        # multimodal / multimodal_attention: avg của 2 normalized features
+        # multimodal / multimodal_attention: concat normalized features
+        # (handles dim mismatch, e.g. CLIP=512 vs BERT=768)
         img = F.normalize(image_feats.float().to(device), dim=1)
         txt = F.normalize(text_feats.float().to(device), dim=1)
-        feats = (img + txt) / 2.0
+        feats = F.normalize(torch.cat([img, txt], dim=1), dim=1)
 
     n = feats.shape[0]
     batch = 256
