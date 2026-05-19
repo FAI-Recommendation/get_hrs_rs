@@ -24,10 +24,10 @@ python3 train.py \
     --model freedom \
     --embed_type mbnv2 \
     --sim_type multimodal_attention \
-    --data_path ../get10k_data/mbnv2_10k_sample \
+    --data_path /root/get_hrs_rs/rs/get10k_data/output_10k_sample \
     --dataset "" \
     --wandb_run_name freedom_multimodal_attention_layers4_dim512_lr0.001_reg1e-04_mbnv2 \
-    --hf_repo_id "$HF_REPO_ID_FREEDOM_MBNV2" \
+    --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
     --lr 0.001 \

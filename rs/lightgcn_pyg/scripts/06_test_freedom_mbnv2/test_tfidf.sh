@@ -18,7 +18,7 @@ python3 train.py \
     --model freedom \
     --embed_type mbnv2 \
     --sim_type tfidf \
-    --data_path ../get10k_data/mbnv2_10k_sample \
+    --data_path /root/get_hrs_rs/rs/get10k_data/output_10k_sample \
     --dataset "" \
     --embed_size 64 \
     --layer_size "[64,64,64]" \

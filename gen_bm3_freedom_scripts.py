@@ -6,7 +6,7 @@ BASE = "rs/lightgcn_pyg/scripts"
 SIM_TYPES = ["img_only", "tfidf", "multimodal", "multimodal_attention"]
 ENCODERS = [
     ("clip",  "../get10k_data/clip_10k_sample"),
-    ("mbnv2", "../get10k_data/mbnv2_10k_sample"),
+    ("mbnv2", "/root/get_hrs_rs/rs/get10k_data/output_10k_sample"),
 ]
 MODELS = [
     ("bm3",     3),   # folder prefix
