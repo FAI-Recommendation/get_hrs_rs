@@ -1,0 +1,44 @@
+<h2>Mục tiêu chính của Evaluate là gì?</h2>
+<p class="subtitle">Câu trả lời này quyết định cách tổ chức toàn bộ charts và bảng so sánh</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Model-centric</h3>
+      <p><strong>"Model nào tốt nhất?"</strong><br>
+      So sánh CombiGCN vs BM3 vs FREEDOM trực tiếp.<br>
+      Mỗi model lấy config tốt nhất (best encoder + sim_type) để đại diện.<br>
+      → Phù hợp cho báo cáo chuyên đề / so sánh baseline.</p>
+      <div style="margin-top:8px; padding:8px; background:#f0f4ff; border-radius:6px; font-size:12px">
+        📊 1 heatmap tổng, 1 barplot best config per model, 1 radar chart
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Config-centric</h3>
+      <p><strong>"Config nào (encoder + sim_type) tốt nhất cho mỗi model?"</strong><br>
+      Phân tích sâu từng model: clip vs mbnv2, img_only vs multimodal vs tfidf...<br>
+      → Phù hợp để hiểu ảnh hưởng của từng yếu tố.</p>
+      <div style="margin-top:8px; padding:8px; background:#f0f4ff; border-radius:6px; font-size:12px">
+        📊 6 lineplots (1 per model×encoder), grouped barplots by sim_type
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Cả hai — 2 tầng</h3>
+      <p><strong>Tầng 1:</strong> So sánh model best-vs-best (A)<br>
+      <strong>Tầng 2:</strong> Phân tích config cho model chiến thắng (B)<br>
+      → Đầy đủ nhất, phù hợp cho chuyên đề có cả phần ablation study.</p>
+      <div style="margin-top:8px; padding:8px; background:#e8f5e9; border-radius:6px; font-size:12px">
+        ⭐ Recommended — tổ chức rõ, kết luận mạnh
+      </div>
+    </div>
+  </div>
+</div>
