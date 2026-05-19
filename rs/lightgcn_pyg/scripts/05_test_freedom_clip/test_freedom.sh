@@ -1,8 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# TEST: CombiGCN + Multimodal (BERT text + CLIP image)
-# Data: CLIP embeddings (clip_10k_sample)
-# Chạy nhanh 20 epochs để kiểm tra pipeline
+# TEST: FREEDOM với CLIP — 20 epochs để verify pipeline
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -17,10 +15,10 @@ if [ -f .env ]; then
 fi
 
 python3 train.py \
-    --model combigcn \
+    --model freedom \
+    --embed_type clip \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
-    --sim_type multimodal \
     --embed_size 64 \
     --layer_size "[64,64,64]" \
     --lr 0.001 \
@@ -30,6 +28,9 @@ python3 train.py \
     --eval_interval 10 \
     --early_stop_steps 3 \
     --Ks "[1,5,10,20]" \
+    --freedom_knn_k 10 \
+    --freedom_cl_weight 0.1 \
+    --freedom_cl_temp 0.2 \
     --verbose 1 \
     --save_flag 0 \
     --gpu_id 0

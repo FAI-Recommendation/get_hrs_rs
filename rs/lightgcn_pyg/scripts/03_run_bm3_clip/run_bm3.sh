@@ -1,16 +1,14 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# FULL RUN: CombiGCN + Multimodal (Weight Attention Fusion)
-# Data: MobileNetV2 embeddings (output_10k_sample)
-# Fusion: WeightedAttention (MultiHeadAttention + Linear projection)
-# Ref: rs/Docs/06_ket_qua_mo_hinh.md
+# FULL RUN: BM3 (Bootstrap Multimodal Contrastive)
+# Data: CLIP embeddings (clip_10k_sample)
+# Paper: Bootstrap Latent Representations for Multi-modal Recommendation, WWW 2023
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
 
 [ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
 
-# Load .env: thu muc hien tai (rs/lightgcn_pyg/) hoac repo root (../../)
 for _env in ".env" "../../.env"; do
     if [ -f "$_env" ]; then
         set -a
@@ -23,12 +21,12 @@ for _env in ".env" "../../.env"; do
 done
 
 python3 train.py \
-    --data_path /root/get_hrs_rs/rs/get10k_data/output_10k_sample \
+    --model bm3 \
+    --embed_type clip \
+    --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
-    --sim_type multimodal \
-    --multimodal_method attention \
-    --wandb_run_name multimodal_attention_layers4_dim512_lr0.001_reg1e-04_mbnv2 \
-    --hf_repo_id "$HF_REPO_ID_MBNV2" \
+    --wandb_run_name bm3_clip_layers4_dim512_lr0.001_reg1e-04 \
+    --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
     --lr 0.001 \
@@ -38,6 +36,8 @@ python3 train.py \
     --eval_interval 40 \
     --early_stop_steps 0 \
     --Ks "[1,5,10,20]" \
+    --bm3_momentum 0.995 \
+    --bm3_cl_weight 0.2 \
     --verbose 1 \
     --save_flag 1 \
     --checkpoint_interval 200 \

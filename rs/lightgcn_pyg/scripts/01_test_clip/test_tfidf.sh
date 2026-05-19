@@ -17,6 +17,7 @@ if [ -f .env ]; then
 fi
 
 python3 train.py \
+    --model combigcn \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
     --sim_type tfidf \

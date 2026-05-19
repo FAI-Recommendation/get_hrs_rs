@@ -1,8 +1,9 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# FULL RUN: CombiGCN + Multimodal (BERT text + CLIP image)
+# FULL RUN: CombiGCN + Multimodal (Weight Attention Fusion)
 # Data: CLIP embeddings (clip_10k_sample)
-# Tương đương: hr/LightGCN_bert_img.py
+# Fusion: WeightedAttention (MultiHeadAttention + Linear projection)
+# Ref: rs/Docs/06_ket_qua_mo_hinh.md
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
@@ -26,7 +27,8 @@ python3 train.py \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
     --sim_type multimodal \
-    --wandb_run_name multimodal_layers4_dim512_lr0.001_reg1e-04_clip \
+    --multimodal_method attention \
+    --wandb_run_name multimodal_attention_layers4_dim512_lr0.001_reg1e-04_clip \
     --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \

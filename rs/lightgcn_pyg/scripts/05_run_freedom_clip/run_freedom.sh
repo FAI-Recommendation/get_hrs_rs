@@ -1,15 +1,14 @@
 #!/bin/bash
 # ─────────────────────────────────────────────
-# FULL RUN: CombiGCN + Multimodal (BERT text + CLIP image)
+# FULL RUN: FREEDOM (Freezing and Denoising for Multimodal Recommendation)
 # Data: CLIP embeddings (clip_10k_sample)
-# Tương đương: hr/LightGCN_bert_img.py
+# Paper: FREEDOM: Freezing and Denoising Graph Structures for Multimodal Recommendation, ACM MM 2023
 # ─────────────────────────────────────────────
 
 cd "$(dirname "$0")/../.."
 
 [ -d /opt/conda/bin ] && export PATH="/opt/conda/bin:$PATH"
 
-# Load .env: thu muc hien tai (rs/lightgcn_pyg/) hoac repo root (../../)
 for _env in ".env" "../../.env"; do
     if [ -f "$_env" ]; then
         set -a
@@ -22,11 +21,11 @@ for _env in ".env" "../../.env"; do
 done
 
 python3 train.py \
-    --model combigcn \
+    --model freedom \
+    --embed_type clip \
     --data_path ../get10k_data/clip_10k_sample \
     --dataset "" \
-    --sim_type multimodal \
-    --wandb_run_name multimodal_layers4_dim512_lr0.001_reg1e-04_clip \
+    --wandb_run_name freedom_clip_layers4_dim512_lr0.001_reg1e-04 \
     --hf_repo_id "$HF_REPO_ID" \
     --embed_size 512 \
     --layer_size "[512,512,512,512]" \
@@ -37,6 +36,9 @@ python3 train.py \
     --eval_interval 40 \
     --early_stop_steps 0 \
     --Ks "[1,5,10,20]" \
+    --freedom_knn_k 10 \
+    --freedom_cl_weight 0.1 \
+    --freedom_cl_temp 0.2 \
     --verbose 1 \
     --save_flag 1 \
     --checkpoint_interval 200 \

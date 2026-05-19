@@ -22,6 +22,7 @@ for _env in ".env" "../../.env"; do
 done
 
 python3 train.py \
+    --model combigcn \
     --data_path /root/get_hrs_rs/rs/get10k_data/output_10k_sample \
     --dataset "" \
     --sim_type img_only \
