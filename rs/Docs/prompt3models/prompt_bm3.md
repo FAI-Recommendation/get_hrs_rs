@@ -154,6 +154,3 @@ Connect them with **exactly 2 edges** (NOT 3):
 6. **NO formulas in the diagram** — only component names and short labels
 7. **EMA target encoder** only copies item_embedding (not the full model)
 8. **Predictor** box — just the label, no internal formula
-
-## Title
-Below the diagram: **"BM3 — Adapted Architecture for Fashion Recommendation (based on Zhou et al., WWW 2023)"**

@@ -47,7 +47,6 @@ OUTPUT (predict)
 
 **sim_type ảnh hưởng đến:**
 
-- `none` → similarity_adj = None, chạy như LightGCN thuần
 - `img_only` → similarity_adj từ image cosine similarity
 - `tfidf` → similarity_adj từ TF-IDF text similarity
 - `multimodal` → similarity_adj = avg(img_sim, txt_sim)
