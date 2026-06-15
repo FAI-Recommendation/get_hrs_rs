@@ -16,7 +16,7 @@ df = load_from_csv("data_wandb/all_runs_summary.csv")
 |---|---|
 | **Models** | `combigcn`, `bm3`, `freedom` |
 | **Encoders** | `clip`, `mbnv2` |
-| **Sim types** | `img_only`, `tfidf`, `multimodal`, `multimodal_attention` |
+| **Sim types** | `img_only`, `text_only`, `multimodal`, `multimodal_attention` |
 | **Metrics** | `recall`, `precision`, `ndcg`, `hit_ratio`, `map`, `mrr` |
 | **K values** | 1, 5, 10, 20 |
 
@@ -26,7 +26,7 @@ df = load_from_csv("data_wandb/all_runs_summary.csv")
 > → CLIP được pre-train trên text-image pairs quy mô lớn nên có thể nắm bắt ngữ nghĩa visual tốt hơn. Tuy nhiên MBNv2 là backbone nhẹ, có thể khớp tốt hơn với đặc trưng texture của sản phẩm thời trang. Xem kết quả ở phần Encoder Breakdown.
 >
 > **Q: sim_type nào dự kiến tốt nhất?**  
-> → `multimodal` kết hợp cả visual lẫn text nên thường dẫn đầu. `tfidf` chỉ dựa vào text, `img_only` chỉ visual. `multimodal_attention` là biến thể có cơ chế attention — thực nghiệm sẽ cho biết nó có cải thiện không.
+> → `multimodal` kết hợp cả visual lẫn text nên thường dẫn đầu. `text_only` chỉ dựa vào text, `img_only` chỉ visual. `multimodal_attention` là biến thể có cơ chế attention — thực nghiệm sẽ cho biết nó có cải thiện không.
 >
 > **Q: 3 models có điểm xuất phát (kiến trúc) khác nhau thế nào?**  
 > → BM3 và FREEDOM là các model contrastive learning mới; CombiGCN dựa trên graph convolution với side information. Kỳ vọng BM3/CombiGCN vượt FREEDOM trong setting có multimodal features.
@@ -141,7 +141,7 @@ Chạy tuần tự cho `combigcn`, `bm3`, `freedom`.
 > → So sánh khoảng cách CLIP vs MBNv2 trên heatmap. Nếu model A cho kết quả gần nhau ở cả 2 encoder: model đó ổn định hơn với feature extraction. Nếu chênh lệch lớn: encoder là yếu tố quyết định.
 >
 > **Q: sim_type nào tệ nhất cho mỗi model và tại sao?**  
-> → Thường là `img_only` hoặc `tfidf` vì chúng chỉ dùng 1 nguồn thông tin. Nếu `multimodal_attention` tệ hơn `multimodal`: cơ chế attention chưa mang lại lợi ích trên dataset này.
+> → Thường là `img_only` hoặc `text_only` vì chúng chỉ dùng 1 nguồn thông tin. Nếu `multimodal_attention` tệ hơn `multimodal`: cơ chế attention chưa mang lại lợi ích trên dataset này.
 >
 > **Q: FREEDOM có cấu hình nào vượt được BM3 hoặc CombiGCN không?**  
 > → Xem ranking table — nếu không có: FREEDOM có vấn đề về kiến trúc hoặc hyperparameter cho task này. → Sang Tier 1 Preview để xem best config mỗi model.

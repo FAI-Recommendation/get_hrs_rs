@@ -20,7 +20,7 @@ from load_data import METRICS, K_VALUES, to_results_dict, get_best_per_model, _f
 
 sns.set_theme(style="whitegrid", palette="Set2", font_scale=1.1)
 
-CHARTS_DIR = Path(r"E:\DoCode\CD2\source\Source\get_hrs_rs\data_evaluate\charts")
+CHARTS_DIR = Path(r"E:\DoCode\CD2\source\Source\get_hrs_rs\data_evaluate\charts_v2")
 
 
 def _show_and_save(fig, title: str, save_path: str = None):

@@ -27,6 +27,8 @@ _ENCODERS = {"clip", "mbnv2"}
 def _parse_folder_name(folder_name: str, config: dict) -> dict:
     """Extract model, encoder, sim_type from folder name + config."""
     sim_type = config.get("sim_type", "unknown")
+    if sim_type == "tfidf":
+        sim_type = "text_only"
     model = config.get("model", None)
 
     # Encoder: last token after splitting by '_' that matches known encoders
@@ -131,6 +133,9 @@ def _parse_run_name(run_name: str) -> dict:
         if rest.startswith(st + "_") or rest == st:
             sim_type = st
             break
+
+    if sim_type == "tfidf":
+        sim_type = "text_only"
 
     return {"model": model, "encoder": encoder, "sim_type": sim_type}
 

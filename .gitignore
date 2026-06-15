@@ -27,3 +27,5 @@ rs/lightgcn_pyg/output.worktrees/
 
 data_evaluate/raw_gpuDocker
 data_evaluate/data_wandb
+
+data_evaluate/charts_v2
