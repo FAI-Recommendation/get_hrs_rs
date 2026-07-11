@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "report/note/Untitled.md",
+                "file": "report/note/01.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Untitled"
+              "title": "01"
             }
           }
         ]
@@ -183,7 +183,7 @@
       "bases:Create new base": false
     }
   },
-  "active": "cc019db3a36c3a49",
+  "active": "d865c10f2671ac96",
   "lastOpenFiles": [
     "report/note/Untitled.md",
     "report/BÁO CÁO TIẾN ĐỘ NGHIÊN CỨU TUẦN 22.md",
